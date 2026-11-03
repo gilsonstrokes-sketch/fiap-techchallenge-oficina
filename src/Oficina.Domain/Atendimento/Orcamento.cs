@@ -5,20 +5,23 @@ namespace Oficina.Domain.Atendimento;
 /// <summary>Versão imutável do orçamento com snapshots das linhas e total calculado.</summary>
 public sealed class Orcamento
 {
-    private readonly IReadOnlyList<ItemOrcamento> _itens;
+    private readonly List<ItemOrcamento> _itens = [];
+
+    // Construtor exclusivo para materialização pelo EF Core; regras de criação continuam em Criar.
+    private Orcamento() { }
 
     private Orcamento(int versao, IReadOnlyList<ItemOrcamento> itens, Dinheiro total)
     {
         Versao = versao;
-        _itens = itens;
+        _itens.AddRange(itens);
         Total = total;
     }
 
-    public int Versao { get; }
+    public int Versao { get; private set; }
 
-    public IReadOnlyList<ItemOrcamento> Itens => _itens;
+    public IReadOnlyList<ItemOrcamento> Itens => _itens.AsReadOnly();
 
-    public Dinheiro Total { get; }
+    public Dinheiro Total { get; private set; }
 
     public bool EhValido => _itens.Count > 0;
 

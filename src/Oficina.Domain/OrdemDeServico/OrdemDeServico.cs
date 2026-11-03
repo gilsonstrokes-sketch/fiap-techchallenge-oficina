@@ -30,7 +30,7 @@ public sealed class OrdemDeServico
 
     public IReadOnlyCollection<Orcamento> Orcamentos => _orcamentos.AsReadOnly();
 
-    public Orcamento? ObterOrcamentoAtual() => _orcamentos.LastOrDefault();
+    public Orcamento? ObterOrcamentoAtual() => _orcamentos.MaxBy(orcamento => orcamento.Versao);
 
     /// <summary>Abre uma OS para as referências de cliente e veículo já validadas pela camada Application.</summary>
     /// <remarks>Application deve confirmar que o veículo pertence ao cliente antes de chamar este método.</remarks>

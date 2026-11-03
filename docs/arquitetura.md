@@ -41,6 +41,7 @@ Esses módulos são candidatos de organização, **não bounded contexts validad
 - Preferir tabelas e constraints explícitas; índices para CPF/CNPJ normalizado, placa e consultas por status/data.
 - Salvar preço e quantidade dos itens na OS/orçamento como **snapshot** para evitar alteração retroativa quando catálogo mudar (proposta a validar).
 - Transações para criação/atualização de OS, aprovação de orçamento e movimentação de estoque; definir estratégia de concorrência antes de implementar baixa de estoque.
+- Decisão para a Etapa 3: concorrência otimista PostgreSQL por `xmin` nos agregados OS e Estoque; traduzir conflito explicitamente, sem retry automático. Application coordena agregados e Infrastructure controla persistência/transações.
 
 ## API e segurança
 - REST JSON, documentação OpenAPI/Swagger UI, códigos HTTP coerentes, ProblemDetails para erros.
