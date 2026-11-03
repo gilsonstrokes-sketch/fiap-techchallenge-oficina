@@ -1,6 +1,6 @@
 # Estratégia de testes e cobertura
 
-Esta é uma estratégia de planejamento da Etapa 0. Nenhum projeto ou teste foi criado/executado nesta etapa.
+Este documento foi preparado na Etapa 0 e atualizado conforme a execução incremental. Na Etapa 2 foram criados testes unitários para o domínio e coletado o relatório de cobertura; veja `docs/relatorios/cobertura-dominio-etapa-2.md`. Quantidades de serviços e peças são inteiras e positivas neste MVP; linhas monetárias usam duas casas e `MidpointRounding.AwayFromZero`.
 
 ## Escopo crítico para cobertura
 
@@ -12,7 +12,7 @@ O relatório de cobertura deve medir o código de domínio que concentra invaria
 - Objetos de valor e validações: CPF/CNPJ, placa, dinheiro e quantidade;
 - Cálculo de duração/média, após a definição de granularidade.
 
-Meta mínima: **80% de cobertura de linhas** sobre o escopo crítico acima, com escopo/arquivos incluídos e excluídos documentados. A ferramenta deve produzir relatório legível e resultado de CI ou artefato versionado. Cobertura não substitui assertions de comportamento, revisão ou testes de integração.
+Meta mínima: **80% de cobertura de linhas** sobre o escopo crítico implementado, com escopo/arquivos incluídos e excluídos documentados. A coleta usa `dotnet test tests/Oficina.Domain.Tests/Oficina.Domain.Tests.csproj --collect:"XPlat Code Coverage"`. O primeiro resultado está versionado no relatório indicado acima. Cobertura não substitui assertions de comportamento, revisão ou testes de integração.
 
 ## Camadas de teste
 

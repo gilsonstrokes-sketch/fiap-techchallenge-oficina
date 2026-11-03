@@ -4,7 +4,7 @@ As decisões abaixo foram fornecidas pelo grupo como propostas para modelagem. N
 
 | ID | Tema | Proposta inicial | Questões que ainda precisam de resposta |
 |---|---|---|---|
-| DB01 | Rejeição de orçamento | Retornar OS a `Em diagnóstico`, preservando a versão e a decisão; permitir nova versão | Quem pode revisar? A rejeição precisa de motivo? Há limite de revisões? |
+| DB01 | Rejeição de orçamento | Retornar OS a `Em diagnóstico`, preservando a versão e a decisão; permitir nova versão | Quem pode revisar? A rejeição precisa de motivo? |
 | DB02 | Estoque | Reservar após aprovação; baixar no início da execução; nunca permitir saldo negativo | O que ocorre se estoque não puder ser reservado após a aprovação? A reserva expira? Como devoluções, cancelamentos e perdas são registradas? |
 | DB03 | Concorrência e transações | Concorrência e transações devem proteger aprovação/reserva e início/baixa | Qual estratégia técnica será usada? A reserva de vários itens é atômica? Como tratar repetição da mesma solicitação? |
 | DB04 | Status | Toda transição decorre de uma ação de negócio | Aprovação leva imediatamente a `Em execução` ou há ação explícita posterior para iniciar? Como representar OS aprovada aguardando execução sem criar status fora do enunciado? |
@@ -17,6 +17,34 @@ As decisões abaixo foram fornecidas pelo grupo como propostas para modelagem. N
 | DB11 | Estoque insuficiente | Sem proposta fechada além de não permitir saldo negativo | Rejeitar aprovação, permitir aprovação pendente de compra ou oferecer substituição? O PDF não define o comportamento. |
 | DB12 | Envio do orçamento | Disponibilizar é suficiente; provedor externo não está definido | Qual canal será demonstrado? Uma API de consulta autenticada é suficiente para o MVP? |
 | DB13 | Cobrança | FIAP não define impostos, descontos, condições de pagamento nem moeda além dos preços | Quais elementos entram no valor calculado e como arredondar? |
+
+## Decisões confirmadas pelo grupo — 2026-11-03
+
+As confirmações abaixo atualizam parcialmente as propostas da tabela. Os pontos explicitamente pendentes continuam sem regra implementada.
+
+| ID | Decisão confirmada | Limite/ponto pendente |
+|---|---|---|
+| DB01 | Rejeitar orçamento retorna a OS para `Em diagnóstico`. | Ainda não foi decidido se o motivo é obrigatório; versões são preservadas sem limite de negócio arbitrário conforme DB19. |
+| DB02 | Reservar estoque após aprovação; baixar no início da execução; não permitir saldo disponível negativo. Falta de estoque bloqueia o início e preserva a aprovação. Estoque é agregado separado de `Peca`. | Atomicidade de reserva/baixa entre múltiplas peças, liberação/devolução e cancelamento seguem pendentes. |
+| DB04 | Aprovação autoriza a execução, mas não inicia a execução. O início é uma ação de negócio separada. | O estado aprovado permanece representado junto ao status `AguardandoAprovacao` até o início, sem novo status. |
+| DB13 | Valores usam BRL, tipo decimal, não negativos, com zero permitido; cada linha é arredondada para duas casas. O modo é `AwayFromZero`, conforme DB17. | Descontos e impostos não foram definidos. |
+| RF05/RT05 | Aceitar placas no formato antigo e Mercosul, normalizadas em maiúsculas sem hífen, ponto ou espaços. | Unicidade da placa e transferência de veículo entre clientes não foram definidas. |
+| DB14 | Orçamento concreto com ao menos um serviço ou peça; linhas preservam tipo, item de catálogo, descrição, quantidade e preço unitário; total soma linhas arredondadas; cada nova proposta gera versão imutável. | Detalhamentos de arredondamento e quantidade estão nas decisões DB17 e DB18. |
+| DB15 | Rejeição registra data e versão do orçamento; motivo é opcional. Reserva confirmada é um contrato tipado validado contra OS, versão, peças e quantidades do orçamento. | A aplicação deve emitir a confirmação apenas após reservar todas as peças; transação, concorrência e compensação serão tratadas na Etapa 3. |
+| DB16 | Documento fiscal do cliente é imutável neste MVP. | Correções cadastrais deverão seguir processo administrativo a definir, se necessário. |
+| DB17 | Valores de cada linha são arredondados para duas casas com `MidpointRounding.AwayFromZero`. | Impostos e descontos continuam fora do escopo definido. |
+| DB18 | Quantidades de serviços e peças são inteiras e positivas; saldo físico do estoque é inteiro e não negativo. | Unidade fracionária não é suportada neste MVP. |
+| DB19 | Orçamentos são versionados e imutáveis, preservando histórico, sem limite de negócio arbitrário de versões. | A numeração técnica usa inteiro positivo; limites físicos da plataforma não são política de negócio. |
+| DB20 | Cancelamento de OS está fora do escopo da Etapa 2; permanecem somente os seis estados oficiais. | Não foi definida transição de cancelamento nem estado correspondente. |
+| DB21 | Ao substituir orçamento aprovado antes da baixa, as reservas da versão anterior devem ser liberadas. A substituição e a liberação serão coordenadas transacionalmente na Etapa 3. | A Etapa 2 não implementa liberação, substituição de orçamento aprovado nem transações entre agregados. |
+
+As demais linhas da tabela permanecem propostas ou pendentes, não aprovadas.
+
+### Limites do contrato de confirmação de reserva
+
+`ReservaPecaConfirmada` não tem construtor público e é emitida pelo agregado `EstoqueDaPeca` após uma reserva local bem-sucedida. `ConfirmacaoReservaEstoque.Criar` é público para permitir que a Application componha os recibos; valida OS, versão, duplicidade de peças e a OS valida correspondência exata das quantidades do orçamento. O contrato é imutável e não aceita um booleano como prova.
+
+O contrato não é assinatura criptográfica, não consulta persistência e não prova que a reserva ainda está ativa nem que os recibos são recentes; uma confirmação válida pode ser reutilizada. Embora o construtor do recibo seja interno, qualquer código com acesso ao modelo pode instanciar um agregado de estoque em memória e obter recibos dele, portanto o recibo também não comprova por si só que houve reserva no estoque persistido autoritativo. A Application deve construí-la somente a partir dos resultados das reservas persistidas e utilizá-la na mesma transação que inicia a OS e baixa as reservas. Validade persistida, uso único efetivo, atomicidade, concorrência e idempotência são responsabilidades da Etapa 3.
 
 ## Vocabulário de decisão
 
