@@ -66,6 +66,19 @@ public sealed class OrdemDeServico
         return orcamento;
     }
 
+    public Orcamento SubstituirOrcamentoAprovado(IEnumerable<ItemOrcamento> itens, DateTimeOffset ocorridoEm)
+    {
+        ExigirStatus(StatusOrdemDeServico.AguardandoAprovacao);
+        if (!OrcamentoAprovado) throw new InvalidOperationException("Somente um orçamento aprovado pode ser substituído por este fluxo.");
+        ExigirDataNaoAnterior(ocorridoEm);
+
+        var orcamento = Orcamento.Criar(_orcamentos.Count + 1, itens);
+        _orcamentos.Add(orcamento);
+        OrcamentoAprovado = false;
+        _historico.Add(new TransicaoOrdemDeServico(Status, Status, "SubstituirOrcamentoAprovado", ocorridoEm));
+        return orcamento;
+    }
+
     public void AprovarOrcamento(DateTimeOffset ocorridoEm)
     {
         ExigirStatus(StatusOrdemDeServico.AguardandoAprovacao);

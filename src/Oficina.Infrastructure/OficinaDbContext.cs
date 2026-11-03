@@ -53,6 +53,7 @@ public sealed class OficinaDbContext(DbContextOptions<OficinaDbContext> options)
                 .HasConversion(documentoConverter)
                 .HasMaxLength(14)
                 .IsRequired();
+            entity.Property(cliente => cliente.Ativo).HasColumnName("ativo").HasDefaultValue(true);
             entity.HasIndex(cliente => cliente.DocumentoFiscal).IsUnique().HasDatabaseName("ux_clientes_documento_fiscal");
         });
 
@@ -70,6 +71,7 @@ public sealed class OficinaDbContext(DbContextOptions<OficinaDbContext> options)
             entity.Property(veiculo => veiculo.Marca).HasColumnName("marca").HasMaxLength(100).IsRequired();
             entity.Property(veiculo => veiculo.Modelo).HasColumnName("modelo").HasMaxLength(120).IsRequired();
             entity.Property(veiculo => veiculo.Ano).HasColumnName("ano");
+            entity.Property(veiculo => veiculo.Ativo).HasColumnName("ativo").HasDefaultValue(true);
             entity.HasIndex(veiculo => veiculo.Placa).IsUnique().HasDatabaseName("ux_veiculos_placa");
             entity.HasAlternateKey(veiculo => new { veiculo.Id, veiculo.ClienteId }).HasName("ak_veiculos_id_cliente");
             entity.HasOne<Cliente>().WithMany().HasForeignKey(veiculo => veiculo.ClienteId).OnDelete(DeleteBehavior.Restrict);
@@ -89,6 +91,7 @@ public sealed class OficinaDbContext(DbContextOptions<OficinaDbContext> options)
                 .HasConversion(dinheiroConverter)
                 .HasColumnType("numeric")
                 .IsRequired();
+            entity.Property(servico => servico.Ativo).HasColumnName("ativo").HasDefaultValue(true);
         });
 
         modelBuilder.Entity<Peca>(entity =>
@@ -105,6 +108,7 @@ public sealed class OficinaDbContext(DbContextOptions<OficinaDbContext> options)
                 .HasConversion(dinheiroConverter)
                 .HasColumnType("numeric")
                 .IsRequired();
+            entity.Property(peca => peca.Ativo).HasColumnName("ativo").HasDefaultValue(true);
         });
     }
 
@@ -228,6 +232,7 @@ public sealed class OficinaDbContext(DbContextOptions<OficinaDbContext> options)
             entity.HasKey(estoque => estoque.PecaId);
             entity.Property(estoque => estoque.PecaId).HasColumnName("peca_id").ValueGeneratedNever();
             entity.Property(estoque => estoque.QuantidadeFisica).HasColumnName("quantidade_fisica").HasColumnType("numeric").IsRequired();
+            entity.Property(estoque => estoque.Revisao).HasColumnName("revisao").HasDefaultValue(0);
             entity.Property<uint>("xmin").IsRowVersion();
             entity.HasOne<Peca>().WithMany().HasForeignKey(estoque => estoque.PecaId).OnDelete(DeleteBehavior.Restrict);
             entity.HasMany(estoque => estoque.Reservas).WithOne().HasForeignKey("PecaId").OnDelete(DeleteBehavior.Restrict);

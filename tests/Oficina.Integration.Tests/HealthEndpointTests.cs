@@ -51,7 +51,10 @@ public sealed class HealthApiFactory : WebApplicationFactory<Program>
         builder.ConfigureAppConfiguration((_, configuration) =>
             configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["ConnectionStrings:Postgres"] = "Host=127.0.0.1;Port=5432;Database=oficina_test;Username=test;Password=test"
+                ["ConnectionStrings:Postgres"] = "Host=127.0.0.1;Port=5432;Database=oficina_test;Username=test;Password=test",
+                ["Authentication:SigningKey"] = "integration-test-signing-key-at-least-32-bytes",
+                ["Authentication:AdminUsername"] = "admin-test",
+                ["Authentication:AdminPassword"] = "integration-test-only-password"
             }));
     }
 }

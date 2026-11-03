@@ -17,6 +17,8 @@ public sealed class Cliente
 
     public DocumentoFiscal DocumentoFiscal { get; }
 
+    public bool Ativo { get; private set; } = true;
+
     public static Cliente Criar(string nome, DocumentoFiscal documentoFiscal)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nome);
@@ -29,4 +31,8 @@ public sealed class Cliente
         ArgumentException.ThrowIfNullOrWhiteSpace(nome);
         Nome = nome.Trim();
     }
+
+    public void Inativar() => Ativo = false;
+
+    public void Reativar() => Ativo = true;
 }

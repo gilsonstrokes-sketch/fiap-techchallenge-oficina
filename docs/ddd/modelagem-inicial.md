@@ -107,3 +107,9 @@ O enunciado exige consulta de andamento por cliente, mas não dita o mecanismo. 
 6. Quais atores podem diagnosticar, orçar, aprovar, iniciar, finalizar, entregar e ajustar estoque?
 7. Qual política de exclusão/inativação aplica a cada cadastro e às relações já existentes?
 
+
+## Implementacao da Etapa 3
+
+A Application valida o vinculo cliente/veiculo, monta snapshots do catalogo para cada versao do orcamento e coordena os agregados OS e Estoque. A aprovacao persiste mesmo se nao houver estoque suficiente; quando houver saldo integral, a reserva acontece na mesma transacao. O inicio da execucao verifica as reservas carregadas do PostgreSQL e, para uma aprovacao sem reserva por falta anterior de saldo, tenta reservar novamente. Se ainda faltar estoque, a operacao falha sem mudar a OS aprovada. A confirmacao tipada e criada somente pela Application a partir das reservas consultadas e nunca e recebida por HTTP.
+
+O Unit of Work implementa transacoes PostgreSQL e traduz conflitos de concorrencia otimista em conflito explicito. As validacoes com repositórios fake sao unitarias e nao substituem os testes round-trip ou de concorrencia executados com PostgreSQL.

@@ -15,7 +15,7 @@ tests/
   Oficina.Integration.Tests/  # Testes HTTP da API
 ```
 
-As dependências seguem `Domain <- Application <- Infrastructure <- Api`; a API referencia Application e Infrastructure somente para composição. Nesta etapa não há regras de negócio, autenticação, migrations ou endpoints de OS.
+As dependências seguem `Domain <- Application <- Infrastructure <- Api`; a API referencia Application e Infrastructure somente para composição. O Domain não depende de EF Core, ASP.NET ou PostgreSQL.
 
 ## Pré-requisitos
 
@@ -43,13 +43,33 @@ O endpoint `/health` informa a saúde do processo da API; nesta etapa ele não v
 
 ## Executar a API pelo SDK
 
-Com o PostgreSQL iniciado por `docker compose up -d db`, configure a connection string apenas na sessão local e inicie a API:
+Com o PostgreSQL iniciado por `docker compose up -d db`, configure a connection string e os dados de autenticação somente na sessão local. O perfil administrativo usa credenciais configuradas por ambiente; não há credenciais padrão versionadas.
 
 ```powershell
 $env:POSTGRES_PASSWORD = "escolha-uma-senha-local"
 $env:ConnectionStrings__Postgres = "Host=localhost;Port=5432;Database=oficina;Username=oficina;Password=$env:POSTGRES_PASSWORD"
+$env:Authentication__SigningKey = "gere-um-segredo-aleatorio-com-pelo-menos-32-bytes"
+$env:Authentication__AdminUsername = "admin-local"
+$env:Authentication__AdminPassword = "defina-uma-senha-local-forte"
 dotnet run --project src/Oficina.Api/Oficina.Api.csproj --urls http://localhost:8080
 ```
+
+Para gerar/aplicar migrations após iniciar o banco, use `dotnet ef database update --project src/Oficina.Infrastructure/Oficina.Infrastructure.csproj --startup-project src/Oficina.Api/Oficina.Api.csproj`. Configure `ConnectionStrings__Postgres` antes de executar e não versione segredos.
+
+## API e autenticação
+
+Swagger/OpenAPI fica disponível em `/swagger` e `/openapi/v1.json` no ambiente `Development`. `/health` verifica o processo. Rotas administrativas exigem JWT Bearer, emitido por `POST /api/auth/admin` com credenciais de ambiente. O token tem papel `Administrator` e expira em oito horas. `POST /api/auth/cliente` valida o documento fiscal vinculado à OS e emite token limitado àquela OS, com validade de 30 minutos.
+
+Rotas implementadas:
+
+- `api/clientes`: listar, consultar, cadastrar, alterar nome, inativar e reativar.
+- `api/veiculos`: listar (opcionalmente por cliente), consultar, cadastrar, alterar e inativar/reativar.
+- `api/catalogo/servicos` e `api/catalogo/pecas`: CRUD com inativação/reativação; `api/estoque/pecas/{id}` consulta saldo e `POST api/estoque/pecas/{id}/entradas` registra entrada.
+- `api/ordens-de-servico`: abrir OS informando CPF/CNPJ do cliente e veículo, consultar, iniciar diagnóstico, criar/substituir orçamento, aprovar/rejeitar, iniciar/finalizar execução e entregar veículo.
+- `api/indicadores/tempo-medio-execucao`: média de execução em horas.
+- `api/consulta/ordens-de-servico/{id}`: consulta limitada pelo claim da OS do token de cliente.
+
+A aprovação registra a decisão mesmo sem estoque disponível. Se todas as peças estão disponíveis, a Application cria reservas na mesma transação; caso falte estoque, o início tenta reservar novamente e permanece bloqueado sem remover a aprovação. Na execução, as reservas são verificadas no estado persistido, a confirmação tipada é criada internamente e a baixa ocorre na transação junto à transição da OS. Conflitos de concorrência retornam HTTP 409, sem retry automático.
 
 ## Build e testes
 
@@ -59,7 +79,11 @@ dotnet build Oficina.slnx --no-restore
 dotnet test Oficina.slnx --no-build
 ```
 
-Os testes iniciais verificam que Domain não referencia camadas externas e que `/health` e o documento OpenAPI respondem. Eles não substituem os testes de domínio e integração dos fluxos críticos, que serão acrescentados nas próximas etapas.
+Testes unitários de Domain cobrem invariantes e transições; testes de Application usam repositórios fake para validar coordenação de aprovação, reserva, baixa e vínculo cliente/veículo. Testes HTTP verificam health, OpenAPI e JWT. O round trip real depende de PostgreSQL e é ignorado se `OFICINA_TEST_POSTGRES` não estiver configurada; EF InMemory não é usado como substituto. Para executá-lo, inicie o Compose e defina `OFICINA_TEST_POSTGRES` com uma connection string de teste antes de `dotnet test`.
+
+A cobertura medida de `Oficina.Domain` é 89,28% de linhas e 81,05% de branches; relatório Cobertura está em `artifacts/coverage/oficina-domain.cobertura.xml`. Para reproduzir, rode `dotnet test Oficina.slnx --collect:"XPlat Code Coverage"` e confira o relatório do pacote `Oficina.Domain`.
+
+Neste ambiente sem Docker, não foram executados round trips PostgreSQL, aplicação da migration nem testes de concorrência real. Mapeamentos e transações ainda precisam ser verificados contra PostgreSQL.
 
 ## Decisões e documentação
 

@@ -19,6 +19,8 @@ public sealed class EstoqueDaPeca
 
     public decimal QuantidadeFisica { get; private set; }
 
+    public int Revisao { get; private set; }
+
     public decimal QuantidadeReservada => _reservas.Sum(reserva => reserva.Quantidade);
 
     /// <summary>Reservas persistíveis que pertencem a este agregado.</summary>
@@ -54,6 +56,7 @@ public sealed class EstoqueDaPeca
         }
 
         _reservas.Add(new ReservaDeEstoque(ordemDeServicoId, versaoOrcamento, quantidade));
+        Revisao++;
         return new ReservaPecaConfirmada(ordemDeServicoId, versaoOrcamento, PecaId, quantidade);
     }
 
@@ -78,6 +81,24 @@ public sealed class EstoqueDaPeca
 
         _reservas.Remove(reserva);
         QuantidadeFisica -= reserva.Quantidade;
+        Revisao++;
+    }
+
+    public void RegistrarEntrada(decimal quantidade)
+    {
+        ExigirQuantidadePositiva(quantidade);
+        QuantidadeFisica += quantidade;
+        Revisao++;
+    }
+
+    public void LiberarReserva(Guid ordemDeServicoId, int versaoOrcamento)
+    {
+        if (ordemDeServicoId == Guid.Empty) throw new ArgumentException("A ordem de serviço é obrigatória.", nameof(ordemDeServicoId));
+        if (versaoOrcamento <= 0) throw new ArgumentOutOfRangeException(nameof(versaoOrcamento));
+        var reserva = _reservas.SingleOrDefault(item => item.CorrespondeA(ordemDeServicoId, versaoOrcamento));
+        if (reserva is null) return;
+        _reservas.Remove(reserva);
+        Revisao++;
     }
 
     private static void ExigirQuantidadePositiva(decimal quantidade)

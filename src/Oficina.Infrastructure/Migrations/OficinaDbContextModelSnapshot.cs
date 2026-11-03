@@ -236,6 +236,12 @@ namespace Oficina.Infrastructure.Migrations
 
             modelBuilder.Entity("Oficina.Domain.Cadastros.Cliente", b =>
                 {
+                    b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("ativo");
+
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
@@ -263,6 +269,12 @@ namespace Oficina.Infrastructure.Migrations
 
             modelBuilder.Entity("Oficina.Domain.Cadastros.Veiculo", b =>
                 {
+                    b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("ativo");
+
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
@@ -312,6 +324,12 @@ namespace Oficina.Infrastructure.Migrations
 
             modelBuilder.Entity("Oficina.Domain.Catalogo.Peca", b =>
                 {
+                    b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("ativo");
+
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
@@ -342,6 +360,12 @@ namespace Oficina.Infrastructure.Migrations
 
             modelBuilder.Entity("Oficina.Domain.Catalogo.Servico", b =>
                 {
+                    b.Property<bool>("Ativo")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("ativo");
+
                     b.Property<Guid>("Id")
                         .HasColumnType("uuid")
                         .HasColumnName("id");
@@ -375,6 +399,12 @@ namespace Oficina.Infrastructure.Migrations
                     b.Property<Guid>("PecaId")
                         .HasColumnType("uuid")
                         .HasColumnName("peca_id");
+
+                    b.Property<int>("Revisao")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("revisao");
 
                     b.Property<decimal>("QuantidadeFisica")
                         .HasColumnType("numeric")

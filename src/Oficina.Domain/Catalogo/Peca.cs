@@ -21,6 +21,8 @@ public sealed class Peca
 
     public Dinheiro Preco { get; private set; }
 
+    public bool Ativo { get; private set; } = true;
+
     public static Peca Criar(string nome, string descricao, Dinheiro preco)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nome);
@@ -36,4 +38,8 @@ public sealed class Peca
         Descricao = descricao.Trim();
         Preco = preco;
     }
+
+    public void Inativar() => Ativo = false;
+
+    public void Reativar() => Ativo = true;
 }

@@ -52,3 +52,7 @@ O contrato não é assinatura criptográfica, não consulta persistência e não
 - **Proposta inicial:** hipótese orientadora de modelagem, ainda sujeita a validação.
 - **Aprovada pelo grupo:** decisão confirmada e apta a orientar implementação; registrar quem/data/justificativa em ADR ou neste documento.
 - **Não definido pela FIAP:** lacuna do enunciado; não atribuir a decisão à instituição.
+
+## Comportamento de estoque implementado na Etapa 3
+
+A aprovação da OS é registrada mesmo quando não há saldo suficiente. Se todos os itens de peça tiverem saldo disponível, as reservas são criadas atomicamente após a aprovação. Se faltar saldo, o início da execução permanece bloqueado e a aprovação continua registrada; uma tentativa posterior pode reservar e baixar as quantidades se o saldo já estiver disponível. A API não aceita confirmações de reserva: a Application consulta o estado persistido, compõe o contrato internamente e executa reserva/baixa junto às transições em transação. Conflitos otimistas são explícitos, sem retry automático. Esta implementação segue a decisão confirmada de que estoque insuficiente bloqueia o início e preserva a aprovação.

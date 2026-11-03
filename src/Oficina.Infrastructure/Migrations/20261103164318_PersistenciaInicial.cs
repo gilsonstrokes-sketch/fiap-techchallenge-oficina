@@ -18,7 +18,8 @@ namespace Oficina.Infrastructure.Migrations
                 {
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     nome = table.Column<string>(type: "character varying(160)", maxLength: 160, nullable: false),
-                    documento_fiscal = table.Column<string>(type: "character varying(14)", maxLength: 14, nullable: false)
+                    documento_fiscal = table.Column<string>(type: "character varying(14)", maxLength: 14, nullable: false),
+                    ativo = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true)
                 },
                 constraints: table =>
                 {
@@ -32,7 +33,8 @@ namespace Oficina.Infrastructure.Migrations
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     nome = table.Column<string>(type: "character varying(160)", maxLength: 160, nullable: false),
                     descricao = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
-                    preco = table.Column<decimal>(type: "numeric", nullable: false)
+                    preco = table.Column<decimal>(type: "numeric", nullable: false),
+                    ativo = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true)
                 },
                 constraints: table =>
                 {
@@ -47,7 +49,8 @@ namespace Oficina.Infrastructure.Migrations
                     id = table.Column<Guid>(type: "uuid", nullable: false),
                     nome = table.Column<string>(type: "character varying(160)", maxLength: 160, nullable: false),
                     descricao = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
-                    preco = table.Column<decimal>(type: "numeric", nullable: false)
+                    preco = table.Column<decimal>(type: "numeric", nullable: false),
+                    ativo = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true)
                 },
                 constraints: table =>
                 {
@@ -64,7 +67,8 @@ namespace Oficina.Infrastructure.Migrations
                     placa = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: false),
                     marca = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     modelo = table.Column<string>(type: "character varying(120)", maxLength: 120, nullable: false),
-                    ano = table.Column<int>(type: "integer", nullable: false)
+                    ano = table.Column<int>(type: "integer", nullable: false),
+                    ativo = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true)
                 },
                 constraints: table =>
                 {
@@ -85,6 +89,7 @@ namespace Oficina.Infrastructure.Migrations
                 {
                     peca_id = table.Column<Guid>(type: "uuid", nullable: false),
                     quantidade_fisica = table.Column<decimal>(type: "numeric", nullable: false),
+                    revisao = table.Column<int>(type: "integer", nullable: false, defaultValue: 0),
                     xmin = table.Column<uint>(type: "xid", rowVersion: true, nullable: false)
                 },
                 constraints: table =>

@@ -20,6 +20,8 @@ public sealed class Servico
 
     public Dinheiro Preco { get; private set; }
 
+    public bool Ativo { get; private set; } = true;
+
     public static Servico Criar(string nome, string descricao, Dinheiro preco)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(nome);
@@ -35,4 +37,8 @@ public sealed class Servico
         Descricao = descricao.Trim();
         Preco = preco;
     }
+
+    public void Inativar() => Ativo = false;
+
+    public void Reativar() => Ativo = true;
 }
