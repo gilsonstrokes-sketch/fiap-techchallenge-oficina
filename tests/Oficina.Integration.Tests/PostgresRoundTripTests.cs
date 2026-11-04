@@ -50,69 +50,102 @@ public sealed class PostgresRoundTripTests(PostgresDatabaseFixture fixture) : IC
     [PostgresFact]
     public async Task Agregados_PersistemERecuperamOrcamentosHistoricoEReservas()
     {
-        var cliente = Cliente.Criar("Cliente Round Trip", CriarCpfValido());
-        var veiculo = Veiculo.Criar(cliente.Id, Placa.Criar("ABC-1234"), "Marca", "Modelo", 2020);
-        var servico = Servico.Criar("Revisão", "Revisão preventiva", Dinheiro.Criar(80m));
-        var peca = Peca.Criar("Filtro", "Filtro de óleo", Dinheiro.Criar(12.50m));
-        var estoque = EstoqueDaPeca.Criar(peca.Id, 8m);
-        var agora = new DateTimeOffset(2026, 11, 3, 12, 0, 0, TimeSpan.Zero);
-        var ordem = OrdemDeServico.Criar(cliente.Id, veiculo.Id, agora);
-        ordem.IniciarDiagnostico(agora.AddMinutes(1));
-        var itemAntigo = ItemOrcamento.Criar(TipoItemOrcamento.Peca, peca.Id, "Filtro versão 1", 1m, Dinheiro.Criar(10m));
-        ordem.DisponibilizarOrcamento([itemAntigo], agora.AddMinutes(2));
-        ordem.RejeitarOrcamento(agora.AddMinutes(3), "Revisar peça");
-        var itemAtual = ItemOrcamento.Criar(TipoItemOrcamento.Peca, peca.Id, "Filtro versão 2", 2m, Dinheiro.Criar(12.50m));
-        var orcamentoAtual = ordem.DisponibilizarOrcamento([itemAtual], agora.AddMinutes(4));
-        ordem.AprovarOrcamento(agora.AddMinutes(5));
-        estoque.Reservar(ordem.Id, orcamentoAtual.Versao, 2m);
+        await using var dbContext = fixture.CriarContexto();
+        await using var transaction = await dbContext.Database.BeginTransactionAsync();
 
-        await using (var gravacao = fixture.CriarContexto())
+        try
         {
-            gravacao.AddRange(cliente, veiculo, servico, peca, estoque, ordem);
-            await gravacao.SaveChangesAsync();
+            var documentoFiscal = await CriarDocumentoFiscalUnicoAsync(dbContext);
+            var placa = await CriarPlacaUnicaAsync(dbContext);
+            var cliente = Cliente.Criar("Cliente Round Trip", documentoFiscal);
+            var veiculo = Veiculo.Criar(cliente.Id, placa, "Marca", "Modelo", 2020);
+            var servico = Servico.Criar("Revisão", "Revisão preventiva", Dinheiro.Criar(80m));
+            var peca = Peca.Criar("Filtro", "Filtro de óleo", Dinheiro.Criar(12.50m));
+            var estoque = EstoqueDaPeca.Criar(peca.Id, 8m);
+            var agora = new DateTimeOffset(2026, 11, 3, 12, 0, 0, TimeSpan.Zero);
+            var ordem = OrdemDeServico.Criar(cliente.Id, veiculo.Id, agora);
+            ordem.IniciarDiagnostico(agora.AddMinutes(1));
+            var itemAntigo = ItemOrcamento.Criar(TipoItemOrcamento.Peca, peca.Id, "Filtro versão 1", 1m, Dinheiro.Criar(10m));
+            ordem.DisponibilizarOrcamento([itemAntigo], agora.AddMinutes(2));
+            ordem.RejeitarOrcamento(agora.AddMinutes(3), "Revisar peça");
+            var itemAtual = ItemOrcamento.Criar(TipoItemOrcamento.Peca, peca.Id, "Filtro versão 2", 2m, Dinheiro.Criar(12.50m));
+            var orcamentoAtual = ordem.DisponibilizarOrcamento([itemAtual], agora.AddMinutes(4));
+            ordem.AprovarOrcamento(agora.AddMinutes(5));
+            estoque.Reservar(ordem.Id, orcamentoAtual.Versao, 2m);
+
+            dbContext.AddRange(cliente, veiculo, servico, peca, estoque, ordem);
+            await dbContext.SaveChangesAsync();
+            dbContext.ChangeTracker.Clear();
+
+            var ordemRecuperada = await new EfOrdemDeServicoRepository(dbContext).ObterPorIdAsync(ordem.Id);
+            var estoqueRecuperado = await new EfEstoqueDaPecaRepository(dbContext).ObterPorPecaIdAsync(peca.Id);
+            var clienteRecuperado = await dbContext.Clientes.SingleAsync(item => item.Id == cliente.Id);
+            var veiculoRecuperado = await dbContext.Veiculos.SingleAsync(item => item.Id == veiculo.Id);
+            var pecaRecuperada = await dbContext.Pecas.SingleAsync(item => item.Id == peca.Id);
+            var servicoRecuperado = await dbContext.Servicos.SingleAsync(item => item.Id == servico.Id);
+
+            Assert.NotNull(ordemRecuperada);
+            Assert.Equal(StatusOrdemDeServico.AguardandoAprovacao, ordemRecuperada.Status);
+            Assert.True(ordemRecuperada.OrcamentoAprovado);
+            Assert.Equal(2, ordemRecuperada.Orcamentos.Count);
+            Assert.Equal(2, ordemRecuperada.ObterOrcamentoAtual()!.Versao);
+            Assert.Equal("Filtro versão 1", ordemRecuperada.Orcamentos.Single(item => item.Versao == 1).Itens.Single().Descricao);
+            Assert.Equal("Filtro versão 2", ordemRecuperada.ObterOrcamentoAtual()!.Itens.Single().Descricao);
+            Assert.Equal(5, ordemRecuperada.Historico.Count);
+            Assert.Equal(2, ordemRecuperada.DecisoesOrcamento.Count);
+            Assert.Equal(2m, ordemRecuperada.ObterOrcamentoAtual()!.Itens.Single().Quantidade);
+            Assert.Equal(25m, ordemRecuperada.ObterOrcamentoAtual()!.Total.Valor);
+
+            Assert.NotNull(estoqueRecuperado);
+            Assert.Equal(8m, estoqueRecuperado.QuantidadeFisica);
+            Assert.Equal(2m, estoqueRecuperado.QuantidadeReservada);
+            Assert.Equal(ordem.Id, estoqueRecuperado.ObterReservaConfirmada(ordem.Id, 2)!.OrdemDeServicoId);
+            Assert.Equal(cliente.DocumentoFiscal, clienteRecuperado.DocumentoFiscal);
+            Assert.Equal(veiculo.Placa, veiculoRecuperado.Placa);
+            Assert.Equal(peca.Preco, pecaRecuperada.Preco);
+            Assert.Equal(servico.Preco, servicoRecuperado.Preco);
         }
-
-        await using var leitura = fixture.CriarContexto();
-        var ordemRecuperada = await new EfOrdemDeServicoRepository(leitura).ObterPorIdAsync(ordem.Id);
-        var estoqueRecuperado = await new EfEstoqueDaPecaRepository(leitura).ObterPorPecaIdAsync(peca.Id);
-        var clienteRecuperado = await leitura.Clientes.SingleAsync(item => item.Id == cliente.Id);
-        var veiculoRecuperado = await leitura.Veiculos.SingleAsync(item => item.Id == veiculo.Id);
-        var pecaRecuperada = await leitura.Pecas.SingleAsync(item => item.Id == peca.Id);
-        var servicoRecuperado = await leitura.Servicos.SingleAsync(item => item.Id == servico.Id);
-
-        Assert.NotNull(ordemRecuperada);
-        Assert.Equal(StatusOrdemDeServico.AguardandoAprovacao, ordemRecuperada.Status);
-        Assert.True(ordemRecuperada.OrcamentoAprovado);
-        Assert.Equal(2, ordemRecuperada.Orcamentos.Count);
-        Assert.Equal(2, ordemRecuperada.ObterOrcamentoAtual()!.Versao);
-        Assert.Equal("Filtro versão 1", ordemRecuperada.Orcamentos.Single(item => item.Versao == 1).Itens.Single().Descricao);
-        Assert.Equal("Filtro versão 2", ordemRecuperada.ObterOrcamentoAtual()!.Itens.Single().Descricao);
-        Assert.Equal(5, ordemRecuperada.Historico.Count);
-        Assert.Equal(2, ordemRecuperada.DecisoesOrcamento.Count);
-        Assert.Equal(2m, ordemRecuperada.ObterOrcamentoAtual()!.Itens.Single().Quantidade);
-        Assert.Equal(25m, ordemRecuperada.ObterOrcamentoAtual()!.Total.Valor);
-
-        Assert.NotNull(estoqueRecuperado);
-        Assert.Equal(8m, estoqueRecuperado.QuantidadeFisica);
-        Assert.Equal(2m, estoqueRecuperado.QuantidadeReservada);
-        Assert.Equal(ordem.Id, estoqueRecuperado.ObterReservaConfirmada(ordem.Id, 2)!.OrdemDeServicoId);
-        Assert.Equal(cliente.DocumentoFiscal, clienteRecuperado.DocumentoFiscal);
-        Assert.Equal(veiculo.Placa, veiculoRecuperado.Placa);
-        Assert.Equal(peca.Preco, pecaRecuperada.Preco);
-        Assert.Equal(servico.Preco, servicoRecuperado.Preco);
+        finally
+        {
+            await transaction.RollbackAsync();
+        }
     }
 
-    private static DocumentoFiscal CriarCpfValido()
+    private static async Task<DocumentoFiscal> CriarDocumentoFiscalUnicoAsync(OficinaDbContext dbContext)
     {
-        string baseCpf;
-        do
+        while (true)
         {
-            baseCpf = Random.Shared.NextInt64(0, 1_000_000_000).ToString("D9");
-        } while (baseCpf.Distinct().Count() == 1);
+            string baseCpf;
+            do
+            {
+                baseCpf = Random.Shared.NextInt64(0, 1_000_000_000).ToString("D9");
+            } while (baseCpf.Distinct().Count() == 1);
 
-        var primeiro = CalcularDigitoCpf(baseCpf, 10);
-        var segundo = CalcularDigitoCpf(baseCpf + primeiro, 11);
-        return DocumentoFiscal.Criar(baseCpf + primeiro + segundo);
+            var primeiro = CalcularDigitoCpf(baseCpf, 10);
+            var segundo = CalcularDigitoCpf(baseCpf + primeiro, 11);
+            var documento = DocumentoFiscal.Criar(baseCpf + primeiro + segundo);
+            if (!await dbContext.Clientes.AnyAsync(cliente => cliente.DocumentoFiscal == documento))
+                return documento;
+        }
+    }
+
+    private static async Task<Placa> CriarPlacaUnicaAsync(OficinaDbContext dbContext)
+    {
+        const string letras = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        while (true)
+        {
+            var placaTexto = string.Concat(
+                letras[Random.Shared.Next(letras.Length)],
+                letras[Random.Shared.Next(letras.Length)],
+                letras[Random.Shared.Next(letras.Length)],
+                Random.Shared.Next(10),
+                letras[Random.Shared.Next(letras.Length)],
+                Random.Shared.Next(10),
+                Random.Shared.Next(10));
+            var placa = Placa.Criar(placaTexto);
+            if (!await dbContext.Veiculos.AnyAsync(veiculo => veiculo.Placa == placa))
+                return placa;
+        }
     }
 
     private static int CalcularDigitoCpf(string digitos, int pesoInicial)
