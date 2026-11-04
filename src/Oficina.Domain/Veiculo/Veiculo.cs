@@ -26,6 +26,8 @@ public sealed class Veiculo
 
     public int Ano { get; private set; }
 
+    public bool Ativo { get; private set; } = true;
+
     public static Veiculo Criar(Guid clienteId, Placa placa, string marca, string modelo, int ano)
     {
         if (clienteId == Guid.Empty) throw new ArgumentException("O cliente é obrigatório.", nameof(clienteId));
@@ -49,4 +51,8 @@ public sealed class Veiculo
         Modelo = modelo.Trim();
         Ano = ano;
     }
+
+    public void Inativar() => Ativo = false;
+
+    public void Reativar() => Ativo = true;
 }

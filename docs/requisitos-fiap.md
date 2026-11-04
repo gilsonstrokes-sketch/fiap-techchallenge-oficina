@@ -1,6 +1,6 @@
 # Requisitos oficiais — Tech Challenge SOAT, Fase 1
 
-**Fonte:** PDF fornecido pelo aluno, `docs/ddd/referencias/Fase 1 - Tech Challenge.pdf`, páginas 2–11. O arquivo foi conferido na Etapa 0; esta página é uma transcrição estruturada/paráfrase e não substitui o enunciado. A localização é diferente de `docs/referencias/`, caminho indicado no pedido. O desafio vale **90% da nota da fase** e é inicialmente previsto para grupo (p. 2).
+**Fonte:** *Fase 1 — Tech Challenge*, páginas 2–11. Esta página resume os requisitos do enunciado; em caso de divergência, prevalece o documento oficial. O desafio corresponde a **90% da nota da fase** e foi proposto para realização em grupo (p. 2).
 
 ## Objetivo e escopo (p. 2)
 MVP do **back-end monolítico** de sistema de oficina mecânica, com gestão de OS, clientes, veículos, serviços, peças e insumos, usando DDD, qualidade e segurança. **Não há requisito de front-end na Fase 1**.
@@ -45,12 +45,12 @@ MVP do **back-end monolítico** de sistema de oficina mecânica, com gestão de 
 - Documentação DDD acessível por link público (Miro ou equivalente), **exportada também no repositório** em `docs/ddd/`: Event Storming de criação da OS, acompanhamento da OS e gestão de peças/insumos; eventos, comandos, políticas, atores, agregados, entidades, objetos de valor, bounded contexts quando identificados, diagramas pedidos na disciplina, linguagem ubíqua, glossário e vínculo com o código.
 - Diagramas e documentação devem refletir a **solução efetivamente entregue**, não exemplos genéricos.
 
-## Conferência e questões que o PDF não define
-O PDF confirma os requisitos listados acima. Também menciona acompanhar o andamento em tempo real e autorizar reparos adicionais via aplicativo como contexto do desafio. A entrega desta fase é um back-end, sem requisito de front-end ou de provedor de notificação; a aprovação/rejeição do orçamento e a consulta de OS pela API não definem a interface ou o mecanismo de identidade.
+## Aspectos não definidos no enunciado
 
-- Sem definição de provedor de envio do orçamento; o PDF aceita **envio ou disponibilização**.
-- Não determina comportamento após rejeição do orçamento, nem se uma OS pode ter múltiplas versões de orçamento.
-- Não define em que momento reservar/baixar estoque ou como tratar estoque insuficiente.
-- Não determina mecanismo de identificação/autorização do cliente que consulta OS.
-- Não determina política de preço histórico, cancelamento, impostos, descontos ou permissões administrativas granulares.
-Esses pontos precisam de decisões explícitas, sem atribuí-las ao enunciado.
+O enunciado menciona acompanhamento em tempo real e autorização de reparos adicionais via aplicativo como contexto. A entrega da Fase 1 é um back-end; não há requisito explícito de interface ou provedor de notificações. O mecanismo de identidade para consulta e decisão do orçamento também não está especificado.
+
+- O enunciado aceita **envio ou disponibilização** do orçamento, mas não define um provedor.
+- Não determina o comportamento após rejeição nem se uma OS pode ter várias versões de orçamento.
+- Não define quando reservar ou baixar estoque, nem como tratar falta de saldo.
+- Não define como identificar e autorizar o cliente que consulta uma OS.
+- Não especifica preço histórico, cancelamento, impostos, descontos ou permissões administrativas granulares.

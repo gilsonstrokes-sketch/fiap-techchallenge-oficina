@@ -30,7 +30,7 @@ public sealed class OrdemDeServico
 
     public IReadOnlyCollection<Orcamento> Orcamentos => _orcamentos.AsReadOnly();
 
-    public Orcamento? ObterOrcamentoAtual() => _orcamentos.LastOrDefault();
+    public Orcamento? ObterOrcamentoAtual() => _orcamentos.MaxBy(orcamento => orcamento.Versao);
 
     /// <summary>Abre uma OS para as referências de cliente e veículo já validadas pela camada Application.</summary>
     /// <remarks>Application deve confirmar que o veículo pertence ao cliente antes de chamar este método.</remarks>
@@ -63,6 +63,19 @@ public sealed class OrdemDeServico
         _orcamentos.Add(orcamento);
         Transicionar(StatusOrdemDeServico.EmDiagnostico, StatusOrdemDeServico.AguardandoAprovacao, "DisponibilizarOrcamento", ocorridoEm);
         OrcamentoAprovado = false;
+        return orcamento;
+    }
+
+    public Orcamento SubstituirOrcamentoAprovado(IEnumerable<ItemOrcamento> itens, DateTimeOffset ocorridoEm)
+    {
+        ExigirStatus(StatusOrdemDeServico.AguardandoAprovacao);
+        if (!OrcamentoAprovado) throw new InvalidOperationException("Somente um orçamento aprovado pode ser substituído por este fluxo.");
+        ExigirDataNaoAnterior(ocorridoEm);
+
+        var orcamento = Orcamento.Criar(_orcamentos.Count + 1, itens);
+        _orcamentos.Add(orcamento);
+        OrcamentoAprovado = false;
+        _historico.Add(new TransicaoOrdemDeServico(Status, Status, "SubstituirOrcamentoAprovado", ocorridoEm));
         return orcamento;
     }
 

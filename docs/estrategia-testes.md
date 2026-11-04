@@ -1,44 +1,37 @@
-# Estratégia de testes e cobertura
+# Estratégia de testes
 
-Este documento foi preparado na Etapa 0 e atualizado conforme a execução incremental. Na Etapa 2 foram criados testes unitários para o domínio e coletado o relatório de cobertura; veja `docs/relatorios/cobertura-dominio-etapa-2.md`. Quantidades de serviços e peças são inteiras e positivas neste MVP; linhas monetárias usam duas casas e `MidpointRounding.AwayFromZero`.
+A suíte separa testes unitários de domínio, testes HTTP e testes de persistência. A cobertura não substitui assertions funcionais nem comprova cenários que não foram executados.
 
-## Escopo crítico para cobertura
+## Organização e execução
 
-O relatório de cobertura deve medir o código de domínio que concentra invariantes e cálculos, inicialmente:
+| Camada | Verificação |
+|---|---|
+| `Oficina.Domain.Tests` | Regras, invariantes, transições, objetos de valor e cálculos sem banco. O relatório versionado mede somente `Oficina.Domain`. |
+| `Oficina.Integration.Tests` | Fluxos da aplicação/API, autenticação, OpenAPI e cenários PostgreSQL reais. |
+| PostgreSQL | Npgsql e migrations da aplicação em uma base de teste dedicada configurada por `OFICINA_TEST_POSTGRES`. Sem essa variável, os testes que exigem PostgreSQL são ignorados. |
 
-- Ordem de Serviço: criação, transições permitidas/proibidas e histórico;
-- Orçamento: composição, snapshots, aprovação/rejeição e revisões;
-- Estoque: reserva, baixa, estorno/devolução e regra de saldo não negativo;
-- Objetos de valor e validações: CPF/CNPJ, placa, dinheiro e quantidade;
-- Cálculo de duração/média, após a definição de granularidade.
+Comandos:
 
-Meta mínima: **80% de cobertura de linhas** sobre o escopo crítico implementado, com escopo/arquivos incluídos e excluídos documentados. A coleta usa `dotnet test tests/Oficina.Domain.Tests/Oficina.Domain.Tests.csproj --collect:"XPlat Code Coverage"`. O primeiro resultado está versionado no relatório indicado acima. Cobertura não substitui assertions de comportamento, revisão ou testes de integração.
+```powershell
+dotnet build Oficina.slnx
+dotnet test Oficina.slnx
+```
 
-## Camadas de teste
+Para executar os testes PostgreSQL, configure `OFICINA_TEST_POSTGRES` para uma base descartável, distinta de `oficina`. A fixture aplica migrations; os testes usam identificadores próprios e removem somente os registros que criaram, ou fazem rollback transacional quando aplicável. Consulte [`testes-postgresql.md`](testes-postgresql.md) para o preparo com Docker Compose.
 
-| Camada | Responsabilidade | Exemplos previstos |
-|---|---|---|
-| Unitário de domínio | Invariantes e cálculos sem banco/rede | Matriz de transições, orçamento, snapshots, estoque, VOs e relógio injetável |
-| Integração de persistência | Mapeamento relacional, constraints, transações e concorrência | PostgreSQL real; migrations; rollback; duas operações concorrentes no mesmo saldo |
-| Integração de aplicação/API | Casos de uso, autorização, serialização e HTTP | Fluxos administrativos JWT, escopo do token do cliente e acesso cruzado negado |
-| Contrato/documentação | API documentada e erros coerentes | Esquemas OpenAPI, códigos HTTP e ProblemDetails |
+## Cenários cobertos
 
-PostgreSQL via Testcontainers é a proposta para testes de integração, a confirmar conforme a disponibilidade de Docker no ambiente de CI. Não usar provedor em memória como evidência de comportamento específico do PostgreSQL.
+- Validação de CPF/CNPJ, placa, dinheiro e quantidade.
+- Transições de OS, composição/versionamento de orçamento, snapshots e histórico.
+- Aprovação, reserva, início da execução, baixa de estoque e consistência transacional.
+- Rollback após falha depois de `SaveChanges` e conflito de concorrência com dois `DbContext`.
+- Autenticação e autorização HTTP, emissão de token, OpenAPI e esquema Bearer.
+- Round trip de persistência usando PostgreSQL real.
 
-## Fluxos críticos a cobrir
+## Cobertura e limites
 
-1. Criar OS, identificar cliente e veículo, registrar diagnóstico e itens.
-2. Gerar/disponibilizar orçamento, aprovar e iniciar execução com estoque consistente.
-3. Rejeitar orçamento, preservar a decisão, retornar a diagnóstico e criar revisão sem reescrever histórico.
-4. Rejeitar operações com estoque insuficiente e demonstrar ausência de saldo negativo sob concorrência.
-5. Finalizar e entregar OS; validar cálculo de duração conforme regra aprovada.
-6. Permitir consulta do cliente autorizado e negar acesso a OS de terceiros.
-7. CRUD/inativação de cadastros usados por OS e perfil administrativo.
+O relatório [`cobertura-dominio-etapa-2.md`](relatorios/cobertura-dominio-etapa-2.md) registra 96,00% de cobertura de linhas e 85,39% de branches em `Oficina.Domain`. Esses percentuais não abrangem todas as camadas nem demonstram, por si só, a meta de 80% para todo o conjunto de domínios críticos.
 
-## Critérios futuros de aceite
+Na revisão atual, a suíte contém 64 testes. `OFICINA_TEST_POSTGRES` não está configurada nesta sessão, portanto uma execução local sem essa variável não valida os cenários PostgreSQL. A execução anterior com banco real, reportada pelo grupo, precede o teste OpenAPI mais recente e não substitui a repetição da suíte atual.
 
-- Comandos de teste e geração de cobertura documentados e reproduzíveis.
-- Relatório mostra pelo menos 80% no escopo crítico aprovado.
-- Testes de integração usam PostgreSQL e validam as constraints e transações relevantes.
-- Cenários negativos e de concorrência possuem asserts explícitos.
-- Resultados e limitações são informados sem declarar como testado algo não executado.
+Pontos sem evidência automatizada suficiente: tentativa de consulta de uma OS alheia com token de cliente, todas as combinações concorrentes de múltiplas peças e comportamento de envio por canal externo. O indicador também depende da definição de granularidade do requisito.

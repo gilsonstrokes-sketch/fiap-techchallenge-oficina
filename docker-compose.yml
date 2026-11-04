@@ -23,6 +23,9 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ASPNETCORE_HTTP_PORTS: 8080
       ConnectionStrings__Postgres: "Host=db;Port=5432;Database=oficina;Username=oficina;Password=${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no ambiente antes de executar o Compose}"
+      Authentication__SigningKey: "${AUTHENTICATION_SIGNING_KEY:?Defina AUTHENTICATION_SIGNING_KEY no ambiente antes de executar o Compose}"
+      Authentication__AdminUsername: "${AUTHENTICATION_ADMIN_USERNAME:?Defina AUTHENTICATION_ADMIN_USERNAME no ambiente antes de executar o Compose}"
+      Authentication__AdminPassword: "${AUTHENTICATION_ADMIN_PASSWORD:?Defina AUTHENTICATION_ADMIN_PASSWORD no ambiente antes de executar o Compose}"
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
