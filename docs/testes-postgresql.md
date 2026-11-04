@@ -9,14 +9,14 @@ Use uma base descartável dedicada, nunca o banco principal `oficina`. A fixture
 No PowerShell, com Docker Desktop ativo:
 
 ```powershell
-$env:POSTGRES_PASSWORD = "senha-local"
-$env:AUTHENTICATION_SIGNING_KEY = "chave-local-com-pelo-menos-32-caracteres"
-$env:AUTHENTICATION_ADMIN_USERNAME = "admin-local"
-$env:AUTHENTICATION_ADMIN_PASSWORD = "senha-admin-local"
+$env:POSTGRES_PASSWORD = "<senha local do PostgreSQL>"
+$env:AUTHENTICATION_SIGNING_KEY = "<chave local com pelo menos 32 caracteres>"
+$env:AUTHENTICATION_ADMIN_USERNAME = "<usuário administrador local>"
+$env:AUTHENTICATION_ADMIN_PASSWORD = "<senha administrativa local>"
 docker compose up -d db
 $dbExists = docker compose exec -T db psql -U oficina -d oficina -tAc "SELECT 1 FROM pg_database WHERE datname = 'oficina_test'"
 if ($dbExists.Trim() -ne "1") { docker compose exec db createdb -U oficina oficina_test }
-$env:OFICINA_TEST_POSTGRES = "Host=localhost;Port=5432;Database=oficina_test;Username=oficina;Password=senha-local"
+$env:OFICINA_TEST_POSTGRES = "Host=localhost;Port=5432;Database=oficina_test;Username=oficina;Password=$env:POSTGRES_PASSWORD"
 dotnet test tests/Oficina.Integration.Tests/Oficina.Integration.Tests.csproj --filter FullyQualifiedName~Postgres
 ```
 

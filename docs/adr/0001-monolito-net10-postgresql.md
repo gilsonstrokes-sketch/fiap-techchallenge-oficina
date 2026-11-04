@@ -1,17 +1,17 @@
 # ADR-0001 — Monólito .NET 10 com PostgreSQL
 
-**Status:** aceita pelo usuário para arquitetura e stack do projeto em 2026-11-03. Políticas de negócio, segurança do cliente e detalhes de persistência ainda requerem validação; não são aprovados por este ADR.
+**Status:** adotada para a arquitetura e stack do projeto em 3 de novembro de 2026. Políticas de negócio, segurança do cliente e detalhes de persistência são tratados em decisões específicas.
 
 ## Contexto
-O Tech Challenge exige back-end monolítico em camadas, API REST, banco justificado, Docker e testes. O aluno tem familiaridade com .NET 10 e escolheu PostgreSQL.
+O Tech Challenge exige back-end monolítico em camadas, API REST, banco justificado, Docker e testes. A stack selecionada pelo grupo é .NET 10 e PostgreSQL.
 
 ## Decisão
 Usar ASP.NET Core Web API .NET 10, PostgreSQL, EF Core 10, organização Domain/Application/Infrastructure/Api, testes xUnit e Docker Compose.
 
-O usuário aprovou esta arquitetura para o projeto. A estrutura e as dependências detalhadas estão em `docs/arquitetura.md`. A aprovação da arquitetura não autoriza implementação além da etapa incremental explicitamente solicitada.
+As dependências entre camadas estão descritas em `docs/arquitetura.md`.
 
 ## Justificativa
-Stack familiar para o desenvolvimento; PostgreSQL é relacional, open source e simples de executar em Docker. EF Core suporta migrations e testes de integração com provedor PostgreSQL.
+.NET 10 atende à stack definida pelo grupo. PostgreSQL fornece persistência relacional, constraints, transações e execução local em Docker. EF Core oferece migrations e integração por Npgsql.
 
 ## Consequências
 - Exige atenção a mapeamento de tipos, índices, migrations, concorrência e transações.

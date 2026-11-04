@@ -8,7 +8,11 @@ using Oficina.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<BearerSecuritySchemeDocumentTransformer>();
+    options.AddOperationTransformer<AuthorizeMetadataOperationTransformer>();
+});
 builder.Services.AddControllers();
 builder.Services.AddHealthChecks();
 builder.Services.AddInfrastructure(builder.Configuration);

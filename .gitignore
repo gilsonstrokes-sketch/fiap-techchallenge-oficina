@@ -7,3 +7,4 @@ coverage/
 .env
 .env.*
 appsettings.Development.json
+/docs/ddd/referencias/Fase 1 - Tech Challenge.pdf

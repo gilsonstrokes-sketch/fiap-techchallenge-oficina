@@ -1,6 +1,6 @@
 # Fluxos de domínio em Mermaid
 
-**Estado:** diagramas de fluxo derivados do código e da API auditados em 2026-11-03. São artefatos de apoio para Event Storming, não ata de reunião nem prova de que os três workshops foram realizados. Os participantes do grupo ainda precisam validar atores, políticas e perguntas em aberto e publicar/exportar os resultados finais.
+Os diagramas representam os fluxos observados no código e na API. São modelos de domínio, não registros de sessões presenciais/colaborativas de Event Storming. Não há atas, boards ou exports de workshop neste repositório.
 
 As caixas marcadas **Comando** são intenções; as caixas **Evento** são fatos de negócio em notação. O código não publica esses fatos em broker e não implementa event sourcing.
 
@@ -156,10 +156,10 @@ flowchart TD
 
 **Invariantes:** `disponível = físico − reservado`; ambos são quantidades inteiras; não reservar acima do disponível; baixar somente reserva existente; mudança concorrente em OS/estoque resulta HTTP 409. Os testes atuais cobrem o cenário com uma peça e conflito de atualização da raiz de estoque; não comprovam ainda todas as corridas simultâneas multi-peça.
 
-## Pontos para as sessões do grupo
+## Questões de domínio em aberto
 
 1. Confirmar quem pode aprovar/rejeitar e se cliente precisa de endpoint autenticado de decisão.
 2. Validar se um fluxo com `Peca` atende também ao termo “insumo” do desafio.
 3. Decidir devolução, cancelamento e reparos adicionais; não há fluxos correspondentes implementados.
 4. Confirmar se tempo médio deve ser medido por OS inteira ou por serviço individual.
-5. Anexar atores/participantes, data, decisões e export público dos boards reais antes de marcar os workshops como concluídos.
+5. Os boards e registros das sessões do grupo não estão incluídos nestes diagramas.

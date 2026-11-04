@@ -1,53 +1,51 @@
-# Checklist final FIAP — Fase 1
+# Checklist de entrega — Fase 1
 
-Atualizado em 2026-11-03 após auditoria do código/documentos disponíveis. **C = concluído com evidência observada; P = parcial ou depende de validação; N = pendente/não comprovado.** Revalidar todos os itens no commit público final. Veja a [matriz de rastreabilidade](matriz-rastreabilidade.md) para detalhe por requisito.
+Estado documental em 3 de novembro de 2026. **C** indica evidência disponível; **P**, implementação parcial ou validação pendente; **N**, entrega sem comprovação no repositório. A [matriz de rastreabilidade](matriz-rastreabilidade.md) detalha os requisitos.
 
 ## Produto
 
 - [C] CRUD de clientes, veículos, serviços e peças; fluxo de estoque implementado.
-- [P] O desafio menciona peças/insumos; não há cadastro separado de `Insumo`. Grupo confirma se `Peca` cobre ambos.
-- [C] Validação CPF/CNPJ e placa no domínio/testes.
-- [C] Criar/listar/detalhar OS, adicionar serviços/peças, orçamento versionado e histórico.
-- [C] Seis status e transições controladas no agregado.
-- [P] Aprovação/rejeição existe, mas somente por administrador; confirmar ator esperado. Cliente recebe token restrito para consulta, sem comando de decisão.
-- [P] Consulta por cliente verifica escopo da OS no JWT; falta evidência de teste automatizado de acesso cruzado.
-- [C] Estoque com reserva, baixa, transação, rollback e conflito de concorrência demonstrados por testes PostgreSQL reportados.
-- [P] Indicador de tempo médio implementado; granularidade/interpretação precisa ser documentada e validada pelo grupo.
+- [P] Não há cadastro separado de `Insumo`; validar se `Peca` atende ao enunciado.
+- [C] Validação de documento fiscal e placa no domínio e em testes.
+- [C] Criação e consulta de OS, diagnóstico, orçamento versionado e histórico.
+- [C] Seis estados de OS e transições controladas no agregado.
+- [P] Aprovação e rejeição de orçamento são administrativas; não há decisão por endpoint de cliente.
+- [P] Token de cliente restringe a consulta a uma OS; falta evidência automatizada de acesso cruzado.
+- [P] Reserva, baixa, transação, rollback e concorrência foram cobertos em testes PostgreSQL anteriores; revalidar a versão atual.
+- [P] Indicador de tempo médio implementado; interpretação da granularidade precisa ser validada.
 
-## Técnica e segurança
+## Arquitetura, execução e segurança
 
-- [C] Monólito em camadas e PostgreSQL justificado em documentação/ADR.
-- [C] REST com Swagger/OpenAPI no perfil Development.
-- [C] Dockerfile/Compose; execução API/PostgreSQL reportada pelo grupo.
-- [C] 63 testes conhecidos aprovados (48 Domain + 15 Integration); repetir após alteração técnica/no commit final.
-- [P] Cobertura: relatório Domain 96,00% linhas/85,39% branches; não prova cobertura de todas as camadas/domínios críticos.
-- [P] NuGet: zero vulnerabilidades conhecidas no feed consultado em 2026-11-03. Análise CVE da imagem não foi concluída; scanner dedicado de segredos não executado.
-- [P] Revisar rate limiting/lockout, HTTPS/configuração não-Development e health check de dependências antes de exposição pública.
-- [C] README atualizado com configuração, migrations, JWT, rotas e testes; testar comandos em ambiente limpo.
-- [P] Busca heurística local não encontrou padrão óbvio de segredo; executar scanner dedicado e revisar histórico antes de publicar.
+- [C] Monólito em camadas; PostgreSQL e EF Core documentados.
+- [C] API REST, Swagger/OpenAPI e esquema Bearer para endpoints protegidos.
+- [C] Dockerfile e Compose versionados; execução local validada anteriormente.
+- [P] Suíte atual: 64 testes. A execução desta revisão não dispõe de `OFICINA_TEST_POSTGRES`; reexecutar para validar os cenários PostgreSQL.
+- [P] Cobertura registrada somente para Domain: 96,00% de linhas e 85,39% de branches.
+- [P] Verificação NuGet de 3 de novembro de 2026 não encontrou advisories; CVEs da imagem e scanner dedicado de segredos pendentes.
+- [P] A API de autenticação não tem rate limiting/lockout comprovado; Compose usa HTTP e `Development`, adequado à demonstração local, não a exposição pública.
+- [C] README documenta configuração, migrations, JWT, endpoints e testes.
+- [P] Nenhum arquivo `.env` está rastreado; busca de segredos local foi heurística e não cobre todo o histórico Git.
 
 ## DDD e documentação
 
-- [P] Modelagem DDD derivada do código: contextos candidatos, agregados, entidades, VOs, invariantes e decisões descritos. Grupo deve validar linguagem/fronteiras.
-- [P] Quatro diagramas Mermaid versionados: abertura/diagnóstico, orçamento/decisão, acompanhamento e estoque. São diagramas derivados do código.
-- [N] Comprovação das sessões/workshops reais, participantes, data e decisões de Event Storming.
-- [N] Link público dos boards e exports PDF/imagem versionados em `docs/ddd/`.
-- [C] Matriz de rastreabilidade e roteiro de demonstração versionados.
+- [P] Modelagem DDD, agregados, invariantes e decisões documentados; fronteiras e linguagem precisam de validação do grupo.
+- [P] Quatro diagramas Mermaid representam fluxos do código atual.
+- [N] Evidências das sessões de Event Storming, participantes e decisões colaborativas.
+- [N] Links públicos dos boards e exports exigidos pela disciplina.
+- [C] Matriz de rastreabilidade e roteiros de demonstração versionados.
 
-## Publicação e avaliação
+## Materiais de entrega e publicação
 
-- [N] Repositório público durante correção/revisão; conferir link e acesso.
-- [N] `main` protegida e fluxo por Pull Request; conferir configuração remota.
-- [N] Branch e hash/tag final registrados no PDF.
-- [P] Segredos: nenhum padrão óbvio na busca heurística; falta scanner dedicado e revisão do histórico.
-- [N] Vídeo público no YouTube (≤15 min), execução real dos fluxos, arquitetura/DDD, JWT, Swagger, testes e segurança. Roteiro disponível em [`roteiro-demonstracao.md`](roteiro-demonstracao.md).
-- [N] PDF único com curso/fase, grupo, nomes completos, RMs, Discord, stack, links completos/clicáveis e identificação do commit.
-- [N] Confirmar que código, PDF, board/export, saída dos testes e vídeo correspondem à mesma versão.
+- [N] Vídeo público de até 15 minutos; roteiro operacional em [`roteiro-gravacao-passo-a-passo.md`](roteiro-gravacao-passo-a-passo.md).
+- [N] PDF único com identificação do grupo, stack, links e hash da versão entregue.
+- [N] Repositório público, branch protegida e fluxo por Pull Request; configuração remota não verificada localmente.
+- [N] Branch/hash finais ainda não associados ao PDF, vídeo, boards e saída da suíte.
+- [P] O PDF original da FIAP está rastreado no repositório e no histórico Git. A redistribuição pública depende de autorização da FIAP.
 
-## Próximas ações de fechamento
+## Fechamento
 
-1. Resolver com o grupo as lacunas RF05, RF09, RF12 e RF14; alterar código somente se a decisão/requisito exigir.
-2. Executar scanner de CVEs da imagem aprovado e scanner de segredos, registrando ferramenta/data/resultado.
-3. Repetir build/testes, incluindo PostgreSQL real, no commit que será publicado.
-4. Realizar/validar workshops e publicar exports/links DDD.
-5. Gravar e publicar o vídeo, preparar o PDF, revisar acesso e registrar branch/hash finais.
+1. Resolver as lacunas RF05, RF09, RF12 e RF14 com o grupo.
+2. Executar a suíte atual com PostgreSQL real em uma base dedicada e registrar a saída.
+3. Concluir análise de imagem e scanner de segredos com ferramentas aprovadas.
+4. Validar e registrar workshops/boards/exports reais.
+5. Gravar e publicar o vídeo; preparar o PDF e verificar que todos os artefatos referenciam o mesmo hash.

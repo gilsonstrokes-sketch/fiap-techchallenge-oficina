@@ -1,8 +1,8 @@
 # Modelagem DDD observada no código
 
-**Estado:** documentação derivada da implementação atual, revisada em 2026-11-03. Os módulos e limites abaixo são candidatos de bounded context; o repositório não contém ata nem evidência de que as sessões obrigatórias de Event Storming tenham sido realizadas pelo grupo. Validar os limites e a linguagem com os participantes antes de apresentá-los como decisões de domínio aprovadas.
+Esta modelagem descreve os elementos presentes na implementação. Cadastro, Catálogo, Atendimento e Estoque são limites candidatos de bounded context; não há registro de sessões formais que confirme essas fronteiras.
 
-Os diagramas de fluxo estão em [`event-storming.md`](event-storming.md). Eles representam comportamentos encontrados no código e não eventos de integração publicados: o sistema não usa broker, event sourcing nem uma infraestrutura de eventos.
+Os diagramas Mermaid estão em [`event-storming.md`](event-storming.md). Eles representam comportamentos do sistema; o código não publica eventos de integração e não usa broker ou event sourcing.
 
 ## Contextos candidatos e relações
 
@@ -63,6 +63,6 @@ Substituir orçamento aprovado antes da baixa libera as reservas da versão ante
 - A migration é aplicada por `dotnet ef database update`/fixture de testes; o startup da API não migra automaticamente o banco.
 - Testes de persistência recebem `OFICINA_TEST_POSTGRES`; os cenários críticos limpam os próprios registros, sem truncar tabelas.
 
-## Pendências de validação de domínio
+## Questões de domínio em aberto
 
 O PDF não especifica canal de envio do orçamento, política de estoque insuficiente, identidade do cliente, cancelamento, devolução, imposto/desconto, pausas de execução ou granularidade do indicador. Decisões de negócio já registradas em `docs/decisoes-negocio.md` orientam a implementação, mas os pontos ainda abertos — em especial DB06 (métrica por OS ou serviço), devoluções/cancelamentos e acesso do cliente — continuam propostas/pendências do grupo, não regras FIAP.
