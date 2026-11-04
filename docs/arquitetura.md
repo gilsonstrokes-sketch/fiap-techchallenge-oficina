@@ -1,60 +1,61 @@
-# Arquitetura aprovada — detalhes sujeitos a revisão
+# Arquitetura do MVP
 
-## Objetivo
-Monólito em camadas, **.NET 10** e **PostgreSQL**, atendendo o enunciado sem superengenharia. O usuário aprovou esta arquitetura para o projeto; ela é uma escolha técnica, não uma exigência de stack da FIAP. As decisões de negócio e detalhes de persistência permanecem sujeitos à validação descrita nos documentos da Etapa 0.
+## Objetivo e decisões
 
-## Solução sugerida
+Monólito organizado em camadas, .NET 10, ASP.NET Core Web API, PostgreSQL e EF Core/Npgsql. PostgreSQL foi escolhido por ser relacional e adequado às constraints, transações e consultas deste domínio; a stack é uma decisão técnica do grupo, não imposição da FIAP. A decisão inicial está em [`adr/0001-monolito-net10-postgresql.md`](adr/0001-monolito-net10-postgresql.md).
+
 ```text
 Oficina.slnx
 src/
-  Oficina.Api/              # controllers/endpoints, JWT, OpenAPI, composition root
-  Oficina.Application/      # casos de uso, DTOs, interfaces de portas
-  Oficina.Domain/           # entidades, VOs, invariantes, eventos de domínio
-  Oficina.Infrastructure/   # EF Core, migrations, repositórios, auth implementation
+  Oficina.Api/              # Controllers, JWT, OpenAPI, composition root
+  Oficina.Application/      # Casos de uso, DTOs e portas de persistência
+  Oficina.Domain/           # Entidades, value objects, invariantes e transições
+  Oficina.Infrastructure/   # EF Core/Npgsql, migrations, repositórios e Unit of Work
 tests/
-  Oficina.Domain.Tests/     # testes de regras, transições, cálculos
-  Oficina.Integration.Tests/# API + PostgreSQL real via Testcontainers (proposta)
+  Oficina.Domain.Tests/     # Regras de domínio e limite arquitetural
+  Oficina.Integration.Tests/# HTTP, workflows e persistência PostgreSQL real
 docs/
-  ddd/                     # Event Storming, diagramas, glossário
-  adr/                     # decisões arquiteturais
-  fases/                   # marcos da implementação
+  ddd/                       # Modelagem code-derived e diagramas Mermaid
+  adr/                       # Decisões técnicas
 ```
 
-## Dependências permitidas
-- `Oficina.Domain`: sem referências a Application, Infrastructure, Api, EF Core, ASP.NET ou banco.
-- `Oficina.Application` → `Oficina.Domain`.
-- `Oficina.Infrastructure` → `Oficina.Application` + `Oficina.Domain`; contém EF Core/Npgsql, migrations e implementações de persistência/identidade.
-- `Oficina.Api` → `Oficina.Application` + `Oficina.Infrastructure` apenas para composição/DI e configuração de hospedagem.
-- `Oficina.Domain.Tests` → `Oficina.Domain`.
-- `Oficina.Integration.Tests` → projetos necessários para subir/testar API e persistência; não deve ser referência de produção.
-- Não criar dependência circular; contratos específicos de casos de uso pertencem a Application, regras invariantes pertencem a Domain.
+## Dependências
 
-## Módulos lógicos (dentro do mesmo processo)
-- **Cadastro**: Cliente, Veículo.
-- **Catálogo e Estoque**: Serviço, Peça/Insumo, movimentações.
-- **Atendimento**: Ordem de Serviço, itens de serviço, orçamento, aprovação, status.
-- **Identidade**: autenticação de administração e autorização de consulta de cliente.
-Esses módulos são candidatos de organização, **não bounded contexts validados**.
+- `Oficina.Domain` não referencia Application, Infrastructure, Api, EF Core, ASP.NET ou banco.
+- `Oficina.Application` depende de Domain.
+- `Oficina.Infrastructure` depende de Application e Domain e implementa as portas de persistência.
+- `Oficina.Api` depende de Application e Infrastructure para composição, hospedagem e HTTP.
+- Projetos de teste referenciam produção, nunca são dependência da aplicação.
+- Regras e transições de negócio ficam no domínio; controllers traduzem HTTP e delegam à Application.
 
-## Persistência e banco
-- PostgreSQL em Docker Compose; EF Core 10 com Npgsql; migrations versionadas.
-- Preferir tabelas e constraints explícitas; índices para CPF/CNPJ normalizado, placa e consultas por status/data.
-- Salvar preço e quantidade dos itens na OS/orçamento como **snapshot** para evitar alteração retroativa quando catálogo mudar (proposta a validar).
-- Transações para criação/atualização de OS, aprovação de orçamento e movimentação de estoque; definir estratégia de concorrência antes de implementar baixa de estoque.
-- Decisão para a Etapa 3: concorrência otimista PostgreSQL por `xmin` nos agregados OS e Estoque; traduzir conflito explicitamente, sem retry automático. Application coordena agregados e Infrastructure controla persistência/transações.
+Os limites conceituais atuais são descritos em [`ddd/modelagem-inicial.md`](ddd/modelagem-inicial.md). Cadastro, Catálogo, Atendimento e Estoque são candidatos de bounded context, ainda sem evidência de validação nas sessões formais de Event Storming.
 
-## API e segurança
-- REST JSON, documentação OpenAPI/Swagger UI, códigos HTTP coerentes, ProblemDetails para erros.
-- JWT Bearer nas rotas administrativas; nunca usar credenciais de demonstração fixas em código.
-- Consulta de cliente via API **não deve expor OS por ID previsível sem autorização**. Desenhar autenticação/escopo do cliente ou token de consulta limitado antes de codificar.
-- Validar CPF/CNPJ (dígitos verificadores) e placa (formatos aplicáveis), com testes de borda.
+## Persistência e consistência
 
-## Testabilidade
-- Regras de negócio no Domain; unitários de transições, orçamento, estoque.
-- Integração de API/persistência com PostgreSQL real, preferencialmente Testcontainers.
-- Escopo planejado de cobertura (OS, orçamento, estoque, VOs e cálculo de duração), relatório e camadas de teste estão em `docs/estrategia-testes.md`.
-- Gerar evidência de cobertura >=80% nos domínios críticos; registrar definição do escopo medido. Esse percentual não prova correção.
-- Análise de vulnerabilidades com ferramenta escolhida e resultado exportado; incluir dependências e imagem Docker quando viável.
+- Migrations versionadas em `src/Oficina.Infrastructure/Migrations/`.
+- Constraints garantem CPF/CNPJ e placa únicos, vínculo OS–veículo–cliente, status permitido, valores monetários com até duas casas e quantidades inteiras válidas.
+- Orçamentos guardam snapshots para não serem alterados quando o Catálogo muda.
+- `OrdemDeServico` e `EstoqueDaPeca` usam concorrência otimista PostgreSQL por `xmin`; conflitos viram `ConcurrencyConflictException` e HTTP 409, sem retry automático.
+- Unit of Work abre transação explícita para aprovação/reserva, substituição do orçamento e início/baixa da execução.
+- A API não executa migrations ao iniciar. Aplicá-las separadamente com EF CLI.
+- Testes PostgreSQL usam uma base descartável passada em `OFICINA_TEST_POSTGRES`; não usam Testcontainers nem EF InMemory.
 
-## Restrições
-Não adicionar front-end na Fase 1. Evitar microserviços, broker, event sourcing, mensageria e padrões extras sem necessidade demonstrável. Não confundir eventos de domínio usados em DDD/Event Storming com obrigação de infraestrutura assíncrona.
+## API e identidade
+
+- JSON REST com Swagger UI e OpenAPI no ambiente `Development`.
+- Rotas administrativas usam Bearer JWT e role `Administrador`. Chave, usuário e senha vêm da configuração ambiente.
+- Login de cliente valida documento fiscal vinculado à OS e emite token com claim de uma única OS; a consulta confere o claim com o ID solicitado.
+- `/health` confirma saúde do processo, não conectividade do banco.
+- `/api/auth/cliente` e controle de acesso cruzado precisam de testes automatizados específicos; o código aplica o escopo, mas esta cobertura não está comprovada no conjunto atual.
+
+## Testabilidade e evidências
+
+- Unitários cobrem invariantes de domínio.
+- Testes PostgreSQL reais cobrem round trip, aprovação/reserva/baixa, rollback após falha injetada depois de `SaveChanges` e concorrência com dois `DbContext` para a mesma raiz de estoque.
+- O teste concorrente confirma conflito para duas atualizações baseadas no mesmo `xmin`; não prova ainda toda corrida de reserva multi-peça entre OS distintas.
+- A cobertura publicada mede `Oficina.Domain`: 96,00% linhas e 85,39% branches, conforme `docs/relatorios/cobertura-dominio-etapa-2.md`. Não é cobertura de toda a lógica da Application ou da API.
+- A análise de dependências NuGet e suas limitações estão em `docs/relatorios/analise-vulnerabilidades.md`.
+
+## Limites de escopo
+
+Sem front-end, microsserviços, broker, event sourcing, CQRS/MediatR ou publicação assíncrona de eventos. Eventos nos diagramas são fatos de negócio em notação Event Storming; não são mensagens emitidas pelo código. Canal de envio de orçamento, cancelamento, devolução e reparos adicionais após início continuam fora ou pendentes de decisão.

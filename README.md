@@ -1,106 +1,95 @@
-# FIAP SOAT — Tech Challenge Fase 1
+# Tech Challenge FIAP SOAT — Fase 1
 
-MVP de back-end monolítico para uma oficina mecânica, construído incrementalmente com .NET 10, ASP.NET Core, PostgreSQL e EF Core 10.
+API REST para gestão de uma oficina mecânica, implementada em .NET 10, C# e PostgreSQL. O escopo inclui cadastros, ordens de serviço, orçamentos, decisões, acompanhamento, estoque, autenticação e indicador de execução. Não há frontend nesta fase.
 
-## Estrutura
+> Antes de publicar ou gravar uma demonstração, confirme os itens marcados como parciais ou pendentes em [`docs/matriz-rastreabilidade.md`](docs/matriz-rastreabilidade.md) e [`docs/checklist-entrega.md`](docs/checklist-entrega.md).
 
-```text
-src/
-  Oficina.Api/            # ASP.NET Core, OpenAPI/Swagger e health check
-  Oficina.Application/    # Casos de uso e coordenação da aplicação
-  Oficina.Domain/         # Regras e tipos de domínio, sem dependências externas
-  Oficina.Infrastructure/ # EF Core, Npgsql e acesso a dados
-tests/
-  Oficina.Domain.Tests/       # Testes de unidade e limites arquiteturais
-  Oficina.Integration.Tests/  # Testes HTTP da API
-```
+## Arquitetura
 
-As dependências seguem `Domain <- Application <- Infrastructure <- Api`; a API referencia Application e Infrastructure somente para composição. O Domain não depende de EF Core, ASP.NET ou PostgreSQL.
+Monólito organizado em camadas: `Api` trata HTTP e autenticação; `Application` orquestra casos de uso; `Domain` concentra entidades, objetos de valor e invariantes sem dependência de infraestrutura; `Infrastructure` implementa persistência EF Core/Npgsql e migrations. Os limites e as decisões são descritos em [`docs/arquitetura.md`](docs/arquitetura.md), [`docs/ddd/modelagem-inicial.md`](docs/ddd/modelagem-inicial.md) e [`docs/adr/`](docs/adr/).
+
+PostgreSQL foi escolhido pela persistência relacional, constraints e suporte transacional, com concorrência otimista por `xmin` no estoque. A aplicação não executa migrations automaticamente ao iniciar: aplique-as explicitamente antes de usar uma base nova.
 
 ## Pré-requisitos
 
-- .NET SDK 10.0
-- Docker com Docker Compose v2, para execução completa
+- Docker Desktop com Compose, ou .NET 10 SDK e PostgreSQL compatível.
+- PowerShell nos exemplos abaixo (adapte a sintaxe para seu shell).
 
 ## Executar com Docker Compose
 
-No PowerShell, configure segredos apenas na sessão local. A chave JWT precisa ter pelo menos 32 bytes:
+Defina segredos locais no ambiente ou em um `.env` não versionado. `.env` é ignorado pelo Git. Use valores locais fortes; a chave JWT precisa ter pelo menos 32 bytes UTF-8.
 
 ```powershell
-$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
-$secretBytes = New-Object 'Byte[]' 32
-$rng.GetBytes($secretBytes)
-$env:POSTGRES_PASSWORD = [Convert]::ToBase64String($secretBytes)
-$rng.GetBytes($secretBytes)
-$env:AUTHENTICATION_SIGNING_KEY = [Convert]::ToBase64String($secretBytes)
-$env:AUTHENTICATION_ADMIN_USERNAME = "admin-local"
-$rng.GetBytes($secretBytes)
-$env:AUTHENTICATION_ADMIN_PASSWORD = [Convert]::ToBase64String($secretBytes)
-$rng.Dispose()
-docker compose up --build
+$env:POSTGRES_PASSWORD = "<senha-local>"
+$env:AUTHENTICATION_SIGNING_KEY = "<chave-local-com-pelo-menos-32-caracteres>"
+$env:AUTHENTICATION_ADMIN_USERNAME = "<usuario-admin>"
+$env:AUTHENTICATION_ADMIN_PASSWORD = "<senha-admin>"
+docker compose up --build -d
+docker compose ps
 ```
 
-O Compose inicia PostgreSQL e API. As credenciais do banco e do JWT vêm do ambiente e não ficam armazenadas no repositório. Para encerrar, use `Ctrl+C`; para remover os containers mantendo os dados, execute `docker compose down`. Não use `docker compose down --volumes` se quiser preservar os dados locais.
+O Compose publica API e PostgreSQL somente em `127.0.0.1` (`8080` e `5432`). O banco de execução tem nome `oficina`. Não use `docker compose down -v` em ambiente com dados que devam ser preservados.
 
-- API: <http://localhost:8080>
-- Health check da API: <http://localhost:8080/health>
-- Swagger UI (ambiente Development): <http://localhost:8080/swagger>
-- Documento OpenAPI: <http://localhost:8080/openapi/v1.json>
-- PostgreSQL local: `localhost:5432`, banco/usuário `oficina`
+Verifique `http://localhost:8080/health`, Swagger em `http://localhost:8080/swagger` e o documento OpenAPI em `http://localhost:8080/openapi/v1.json`. Swagger/OpenAPI é exposto no ambiente `Development` configurado pelo Compose. O health check atual mede a disponibilidade do processo, não é uma prova de prontidão do PostgreSQL.
 
-O endpoint `/health` informa a saúde do processo da API; nesta etapa ele não verifica conectividade com o banco.
+## Migrations
 
-## Executar a API pelo SDK
-
-Com o PostgreSQL iniciado por `docker compose up -d db`, configure a connection string e os dados de autenticação somente na sessão local. O perfil administrativo usa credenciais configuradas por ambiente; não há credenciais padrão versionadas.
+As migrations versionadas ficam em `src/Oficina.Infrastructure/Migrations/`. Para criar/aplicar migrations via EF CLI, use a solution e informe `Infrastructure` como projeto de migrations e `Api` como startup, com a connection string configurada localmente. Exemplo para aplicar migrations em uma base já iniciada pelo Compose:
 
 ```powershell
-$env:POSTGRES_PASSWORD = "escolha-uma-senha-local"
-$env:ConnectionStrings__Postgres = "Host=localhost;Port=5432;Database=oficina;Username=oficina;Password=$env:POSTGRES_PASSWORD"
-$env:Authentication__SigningKey = "gere-um-segredo-aleatorio-com-pelo-menos-32-bytes"
-$env:Authentication__AdminUsername = "admin-local"
-$env:Authentication__AdminPassword = "defina-uma-senha-local-forte"
-dotnet run --project src/Oficina.Api/Oficina.Api.csproj --urls http://localhost:8080
+dotnet ef database update --project src/Oficina.Infrastructure --startup-project src/Oficina.Api
 ```
 
-Para gerar/aplicar migrations após iniciar o banco, use `dotnet ef database update --project src/Oficina.Infrastructure/Oficina.Infrastructure.csproj --startup-project src/Oficina.Api/Oficina.Api.csproj`. Configure `ConnectionStrings__Postgres` antes de executar e não versione segredos.
+Confirme a connection string antes do comando; não a grave no repositório. Em Compose, a API aguarda o health check do banco, mas não altera o schema sozinha.
 
-## API e autenticação
+## Autenticação e endpoints
 
-Swagger/OpenAPI fica disponível em `/swagger` e `/openapi/v1.json` no ambiente `Development`. `/health` verifica o processo. Rotas administrativas exigem JWT Bearer, emitido por `POST /api/auth/admin` com credenciais de ambiente. O token tem papel `Administrator` e expira em oito horas. `POST /api/auth/cliente` valida o documento fiscal vinculado à OS e emite token limitado àquela OS, com validade de 30 minutos.
+Solicite token administrativo em `POST /api/auth/admin`. As rotas administrativas exigem JWT com papel `Administrador`; sem token retornam `401`. O endpoint `POST /api/auth/cliente` emite um token de consulta vinculado a uma OS e documento fiscal. `GET /api/consulta/ordens-de-servico/{id}` valida o ID solicitado contra o claim `ordem_id` do token.
 
-Rotas implementadas:
+| Área | Endpoints principais | Acesso |
+|---|---|---|
+| Autenticação | `POST /api/auth/admin`, `POST /api/auth/cliente` | Público; credenciais/documento validados |
+| Clientes | `/api/clientes` CRUD | Administrador |
+| Veículos | `/api/veiculos` CRUD | Administrador |
+| Serviços e peças | `/api/servicos`, `/api/pecas` CRUD | Administrador |
+| Estoque | `GET /api/estoque/pecas/{pecaId}`, `POST /api/estoque/pecas/{pecaId}/entradas` | Administrador |
+| Ordens de serviço | `/api/ordens-de-servico`, detalhes, diagnóstico, orçamento, aprovação/rejeição/substituição, início/finalização/entrega | Administrador |
+| Consulta de cliente | `GET /api/consulta/ordens-de-servico/{id}` | JWT de consulta restrito à OS do claim |
+| Indicador | `GET /api/indicadores/tempo-medio-execucao` | Administrador |
 
-- `api/clientes`: listar, consultar, cadastrar, alterar nome, inativar e reativar.
-- `api/veiculos`: listar (opcionalmente por cliente), consultar, cadastrar, alterar e inativar/reativar.
-- `api/catalogo/servicos` e `api/catalogo/pecas`: CRUD com inativação/reativação; `api/estoque/pecas/{id}` consulta saldo e `POST api/estoque/pecas/{id}/entradas` registra entrada.
-- `api/ordens-de-servico`: abrir OS informando CPF/CNPJ do cliente e veículo, consultar, iniciar diagnóstico, criar/substituir orçamento, aprovar/rejeitar, iniciar/finalizar execução e entregar veículo.
-- `api/indicadores/tempo-medio-execucao`: média de execução em horas.
-- `api/consulta/ordens-de-servico/{id}`: consulta limitada pelo claim da OS do token de cliente.
+O código atual registra aprovação e rejeição nas rotas administrativas. Não há endpoint de decisão autenticado como cliente; essa diferença em relação ao ator esperado precisa ser validada pelo grupo e está marcada como lacuna, não deve ser ocultada na demonstração. Veja as rotas e schemas exatos no OpenAPI.
 
-A aprovação registra a decisão mesmo sem estoque disponível. Se todas as peças estão disponíveis, a Application cria reservas na mesma transação; caso falte estoque, o início tenta reservar novamente e permanece bloqueado sem remover a aprovação. Na execução, as reservas são verificadas no estado persistido, a confirmação tipada é criada internamente e a baixa ocorre na transação junto à transição da OS. Conflitos de concorrência retornam HTTP 409, sem retry automático.
+Configuração por variáveis de ambiente: `ConnectionStrings__Postgres`, `Authentication__SigningKey`, `Authentication__AdminUsername` e `Authentication__AdminPassword`. Não coloque tokens, senhas reais ou connection strings com credenciais em arquivos versionados, exemplos ou commits.
 
-## Build e testes
+## Testes
 
 ```powershell
-dotnet restore Oficina.slnx
-dotnet build Oficina.slnx --no-restore
-dotnet test Oficina.slnx --no-build
+dotnet build Oficina.slnx
+dotnet test Oficina.slnx
 ```
 
-Testes unitários de Domain cobrem invariantes e transições; testes de Application com repositórios fake validam coordenação, enquanto testes PostgreSQL reais validam round trip, aprovação/reserva/baixa, rollback e concorrência otimista com dois `DbContext`. Testes HTTP verificam health, OpenAPI e autenticação JWT. Os testes PostgreSQL são ignorados se `OFICINA_TEST_POSTGRES` não estiver configurada e usam uma base descartável dedicada; EF InMemory não substitui PostgreSQL. Consulte `docs/testes-postgresql.md` para os comandos.
+A suíte tem testes unitários e de integração HTTP. Os testes que validam PostgreSQL real usam a variável `OFICINA_TEST_POSTGRES`, aplicam migrations e são ignorados quando ela não está configurada. Use uma base dedicada descartável, como `oficina_test`; nunca a base principal `oficina`:
 
-A cobertura medida de `Oficina.Domain` é 89,28% de linhas e 81,05% de branches; relatório Cobertura está em `artifacts/coverage/oficina-domain.cobertura.xml`. Para reproduzir, rode `dotnet test Oficina.slnx --collect:"XPlat Code Coverage"` e confira o relatório do pacote `Oficina.Domain`.
+```powershell
+$env:POSTGRES_PASSWORD = "<senha-local>"
+$env:AUTHENTICATION_SIGNING_KEY = "<chave-local-com-pelo-menos-32-caracteres>"
+$env:AUTHENTICATION_ADMIN_USERNAME = "<usuario-admin>"
+$env:AUTHENTICATION_ADMIN_PASSWORD = "<senha-admin>"
+docker compose up -d db
+docker compose exec db createdb -U oficina oficina_test
+$env:OFICINA_TEST_POSTGRES = "Host=localhost;Port=5432;Database=oficina_test;Username=oficina;Password=$env:POSTGRES_PASSWORD"
+dotnet test tests/Oficina.Integration.Tests/Oficina.Integration.Tests.csproj
+```
 
-O health check informa a saúde do processo, não a conectividade com o PostgreSQL. Os testes de persistência usam a base especificada por `OFICINA_TEST_POSTGRES`, aplicam migrations e limpam apenas os dados criados pelos próprios cenários.
+Se `oficina_test` já existir, não execute `createdb` novamente. Consulte [`docs/testes-postgresql.md`](docs/testes-postgresql.md) para o escopo dos cenários. No último resultado reportado pelo grupo, a suíte completa teve 63 aprovados; repita os comandos no commit final para produzir evidência associada a esse commit.
 
-## Decisões e documentação
+O relatório versionado [`docs/relatorios/cobertura-dominio-etapa-2.md`](docs/relatorios/cobertura-dominio-etapa-2.md) informa 96,00% de linhas e 85,39% de branches para o projeto `Domain` no escopo descrito. Isso não mede a cobertura completa de Application/Infrastructure nem comprova por si só todos os fluxos críticos.
 
-- Requisitos oficiais transcritos: `docs/requisitos-fiap.md`.
-- Arquitetura e dependências: `docs/arquitetura.md`.
-- Propostas e pendências de negócio: `docs/decisoes-negocio.md`.
-- Modelagem DDD e planejamento dos Event Stormings: `docs/ddd/`.
-- Estratégia de testes e cobertura: `docs/estrategia-testes.md`.
-- Plano incremental: `docs/plano-implementacao.md`.
+## Documentação e entrega
 
-O PDF original da FIAP está em `docs/ddd/referencias/`. Antes de publicar o repositório, confirme que a inclusão desse material do curso é permitida.
+- Requisitos e rastreabilidade: [`docs/requisitos-fiap.md`](docs/requisitos-fiap.md), [`docs/matriz-rastreabilidade.md`](docs/matriz-rastreabilidade.md).
+- DDD e fluxos Mermaid: [`docs/ddd/modelagem-inicial.md`](docs/ddd/modelagem-inicial.md), [`docs/ddd/event-storming.md`](docs/ddd/event-storming.md).
+- Segurança: [`docs/relatorios/analise-vulnerabilidades.md`](docs/relatorios/analise-vulnerabilidades.md).
+- Demonstração e checklist: [`docs/roteiro-demonstracao.md`](docs/roteiro-demonstracao.md), [`docs/checklist-entrega.md`](docs/checklist-entrega.md).
+
+O repositório contém documentação técnica; PDF final, links públicos dos boards/exports do grupo e vídeo público precisam ser preenchidos e conferidos pelo grupo conforme o checklist antes da entrega.

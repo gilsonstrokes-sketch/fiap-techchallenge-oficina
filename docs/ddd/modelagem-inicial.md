@@ -1,115 +1,68 @@
-# Modelagem DDD — proposta para validação
+# Modelagem DDD observada no código
 
-Este documento é uma hipótese de modelagem baseada no enunciado e nas propostas de negócio em `docs/decisoes-negocio.md`. Não substitui os três Event Stormings obrigatórios. Nenhum bounded context está validado até a sessão; módulos abaixo são organização lógica preliminar.
+**Estado:** documentação derivada da implementação atual, revisada em 2026-11-03. Os módulos e limites abaixo são candidatos de bounded context; o repositório não contém ata nem evidência de que as sessões obrigatórias de Event Storming tenham sido realizadas pelo grupo. Validar os limites e a linguagem com os participantes antes de apresentá-los como decisões de domínio aprovadas.
 
-## Linguagem ubíqua inicial
+Os diagramas de fluxo estão em [`event-storming.md`](event-storming.md). Eles representam comportamentos encontrados no código e não eventos de integração publicados: o sistema não usa broker, event sourcing nem uma infraestrutura de eventos.
 
-| Termo | Significado provisório |
-|---|---|
-| Cliente | Pessoa física ou jurídica identificada por CPF/CNPJ |
-| Veículo | Veículo vinculado ao cliente, identificado pela placa |
-| Ordem de Serviço (OS) | Registro do atendimento, diagnóstico, autorização e execução de serviços para um veículo |
-| Serviço | Atividade oferecida pela oficina, com preço de referência |
-| Peça/Insumo | Item catalogado e sujeito a controle de estoque |
-| Orçamento | Itens e valores propostos para autorização do cliente; cada versão é imutável e o histórico é preservado |
-| Revisão do orçamento | Nova versão imutável da proposta; não há limite de negócio arbitrário de versões |
-| Reserva | Quantidade comprometida para uma OS aprovada, ainda não baixada do saldo físico |
-| Baixa | Consumo da quantidade reservada no início da execução |
-| Inativação | Impedir uso futuro em novos registros sem apagar referências históricas |
+## Contextos candidatos e relações
 
-## Implementação do domínio (Etapa 2)
+| Contexto candidato | Responsabilidade no código | Relação observada |
+|---|---|---|
+| **Cadastro** | `Cliente` e `Veiculo`, documentos, placas e estado ativo | Atendimento referencia os identificadores. `OficinaApplicationService` valida cliente ativo, veículo ativo e vínculo do veículo antes de abrir OS. |
+| **Catálogo** | `Servico` e `Peca`, descrição, preço de referência e inativação | Atendimento lê catálogo ao gerar orçamento e copia descrição, tipo, identificador, preço e quantidade para snapshots imutáveis. |
+| **Atendimento** | `OrdemDeServico`, diagnóstico, histórico, versões de orçamento, decisões e execução | Raiz da OS; usa identificadores do Cadastro e snapshots lidos do Catálogo. |
+| **Estoque** | `EstoqueDaPeca`, saldo físico e reservas por OS/versão | É agregado separado de `Peca`. A Application coordena a reserva e baixa junto às transições de Atendimento em transação PostgreSQL. |
+| **Identidade e acesso** *(módulo técnico; bounded context não confirmado)* | Login administrativo JWT e emissão de token de consulta limitado a uma OS | Implementação em `Oficina.Api`; consulta de cliente recebe apenas dados reduzidos da OS. Não há identidade persistida nem provedor externo. |
 
-Implementados no projeto `Oficina.Domain`:
+Estes contextos são separações conceituais dentro de um único processo e banco. Não são projetos, serviços implantáveis nem limites já validados em workshop. A Application é a camada de orquestração; Infrastructure implementa repositórios, `xmin` e Unit of Work; Api compõe, autentica e expõe HTTP.
 
-- `DocumentoFiscal` normaliza CPF/CNPJ; valida CPF e CNPJ numérico/alfanumérico pelos dígitos verificadores e deriva o tipo do documento validado.
-- `Placa` aceita formato antigo e Mercosul; normaliza para maiúsculas e remove hífen, ponto e espaços.
-- `Dinheiro` representa BRL como `decimal`, aceita zero, rejeita valores negativos e valores com mais de duas casas decimais.
-- `Cliente`, `Veiculo`, `Servico` e `Peca` validam os dados essenciais de criação e atualização. `Peca` não carrega saldo de estoque.
-- `OrdemDeServico` é a raiz do agregado de atendimento. Inicia em `Recebida`, registra as transições por ações explícitas, decisões do orçamento e os horários de início/finalização da execução.
-- `EstoqueDaPeca` é uma raiz separada por item de catálogo: controla saldo físico e uma coleção persistível de `ReservaDeEstoque` por OS/versão, disponibilidade e baixa, sem aceitar reserva que gere saldo disponível negativo. A raiz pode emitir um recibo apenas para uma reserva ainda presente no estado carregado.
-- `Orcamento` é uma versão imutável dentro da OS. Cada `ItemOrcamento` guarda snapshot de tipo, identificador de catálogo, descrição, quantidade inteira positiva e preço unitário; linha é arredondada a duas casas com `MidpointRounding.AwayFromZero` e o total da versão é calculado no domínio. Não há limite de negócio para a quantidade de versões. A rejeição registra versão, data e motivo opcional.
-- `ConfirmacaoReservaEstoque` é o contrato tipado entre a orquestração da aplicação e a OS: valida identidade da OS, versão aprovada e as quantidades agregadas de cada peça sem referência ao agregado `EstoqueDaPeca`.
-- O contrato de confirmação é uma validação de coerência, não uma prova criptográfica ou persistida: os recibos têm construtor interno e são emitidos pelo estoque, mas a confirmação pode ser reutilizada e não verifica se a reserva continua ativa. A Application deve compor os recibos após todas as reservas e usá-los na transação de início/baixa; uso único efetivo, atomicidade e concorrência ficam para a Etapa 3.
-- `OrdemDeServico` possui construtor privado sem parâmetros e setters privados para permitir materialização futura pelo EF Core; o mapeamento permanece responsabilidade de Infrastructure, sem anotações ou referências a EF no Domain.
+## Agregados, entidades e invariantes
 
-`StatusOrdemDeServico` contém os estados RF10: `Recebida`, `EmDiagnostico`, `AguardandoAprovacao`, `EmExecucao`, `Finalizada` e `Entregue`. O fluxo implementado é `Recebida` → `EmDiagnostico` → `AguardandoAprovacao`; rejeição retorna a `EmDiagnostico`; aprovação registra autorização sem alterar o status; início explícito, com reserva confirmada, leva a `EmExecucao`; finalização e entrega avançam para `Finalizada` e `Entregue`.
+| Agregado / raiz | Entidades e estado subordinado | Invariantes observadas |
+|---|---|---|
+| `Cliente` | Raiz `Cliente` | Nome não vazio; `DocumentoFiscal` precisa ser válido; documento é imutável no modelo; ativo/inativo pode ser alternado. O índice `ux_clientes_documento_fiscal` garante unicidade persistida. |
+| `Veiculo` | Raiz `Veiculo` | Cliente obrigatório; placa válida; marca/modelo não vazios; ano positivo; cliente não pode ser trocado após criação pelo modelo atual. Placa única no banco; FK composta mantém o par veículo/cliente usado pela OS. |
+| `Servico` | Raiz `Servico` | Nome e descrição não vazios; preço é `Dinheiro`; pode ser inativado/reativado. O orçamento conserva snapshot do preço anterior. |
+| `Peca` | Raiz de catálogo `Peca` | Nome e descrição não vazios; preço é `Dinheiro`; pode ser inativada/reativada. Não contém saldo: este pertence a `EstoqueDaPeca`. |
+| `OrdemDeServico` | `Orcamento` versionado, `ItemOrcamento`, `TransicaoOrdemDeServico`, `DecisaoOrcamento` | Apenas as seis situações RF10; cada ação valida o estado de origem; datas não podem anteceder o último evento/decisão; versão de orçamento positiva e não vazia; histórico e decisões permanecem associados à OS. Aprovação é booleano separado enquanto o status permanece `AguardandoAprovacao`. |
+| `EstoqueDaPeca` | `ReservaDeEstoque` por OS e versão | Saldo físico e quantidades são inteiros não negativos/positivos; quantidade disponível não pode ser negativa; reserva é única por peça/OS/versão; baixa só consome reserva existente e reduz saldo físico. `xmin` detecta atualização concorrente. |
 
-A OS mantém aprovação como estado interno enquanto o status oficial continua `AguardandoAprovacao`. `DisponibilizarOrcamento` cria uma nova versão concreta, não vazia, a partir de snapshots fornecidos pela aplicação; rejeição preserva a versão e libera a OS para diagnóstico e nova versão. A aplicação deve validar que o veículo pertence ao cliente antes de criar a OS. Também deve coordenar aprovação/reserva e início/baixa entre agregados, emitir a confirmação tipada apenas após todas as reservas terem sucesso e executar a operação em transação. Transações, concorrência otimista/relacional e testes PostgreSQL ficam para a Etapa 3; a camada Domain não acessa infraestrutura.
+As referências entre raízes são por identificador e validadas na Application/Infrastructure. Não há entidade `Insumo` distinta: o código trata itens controlados no estoque como `Peca`. Confirmar se isso cobre o vocabulário exigido pelo grupo/FIAP.
 
-## Módulos lógicos candidatos
+## Objetos de valor e tipos de domínio
 
-- **Cadastro:** Cliente e Veículo.
-- **Catálogo:** Serviço e Peça/Insumo.
-- **Estoque:** saldo, reservas e movimentos.
-- **Atendimento:** OS, diagnóstico, itens, orçamento, decisões e execução.
-- **Identidade:** perfil administrativo e autorização da consulta de cliente.
+- `DocumentoFiscal`: normaliza e valida CPF e CNPJ numérico/alfanumérico; deriva `TipoDocumentoFiscal`.
+- `Placa`: normaliza e valida formato antigo e Mercosul.
+- `Dinheiro`: `decimal` não negativo, até duas casas decimais; soma preserva a regra.
+- `ItemOrcamento`: snapshot imutável de tipo, item de catálogo, descrição, quantidade inteira positiva, preço e total da linha; arredonda a linha com `MidpointRounding.AwayFromZero`.
+- `ReservaPecaConfirmada` e `ConfirmacaoReservaEstoque`: contratos tipados para validar OS, versão, peças e quantidades antes da transição de início. Não são assinatura criptográfica nem prova independente de estado persistido; a Application deve criá-los a partir do estoque carregado e usá-los na transação.
+- `StatusOrdemDeServico` e `TipoItemOrcamento`: enums fechados no código.
 
-São módulos no mesmo monólito e não bounded contexts confirmados. A fronteira entre Catálogo e Estoque, e a fronteira entre Atendimento e Orçamento, devem ser validadas no Event Storming.
+IDs `Guid`, timestamps e números de sequência do banco são identificadores/tipos técnicos, não objetos de valor de negócio.
 
-## Agregados e invariantes candidatos
+## Transições de OS implementadas
 
-| Agregado candidato | Responsabilidade/invariantes a validar |
-|---|---|
-| OrdemDeServico (raiz) | Status, ações válidas, histórico, decisões, versões imutáveis do orçamento e tempos de execução. Cliente e veículo são referenciados por identificadores; Application valida a relação entre eles. |
-| EstoqueDaPeca (raiz por peça) | Saldo físico e reservas por OS; disponibilidade não negativa; baixa consome somente quantidade reservada. A coordenação transacional de várias peças segue para a camada Application/Infrastructure. |
-| Cliente | Identificador, nome e documento fiscal validado. Unicidade persistente e inativação ainda dependem de decisões pendentes. |
-| Veiculo | Identificador, cliente, placa, marca, modelo e ano. Unicidade e transferência de proprietário seguem pendentes. |
-| Servico / Peca | Entidades de catálogo com nome, descrição e preço `Dinheiro`; `Peca` não possui estoque. |
-| Orcamento (entidade imutável na OS) | Versão sem limite arbitrário de negócio, linhas snapshot com quantidades inteiras positivas, total calculado por linha arredondada com `AwayFromZero`. A decisão de rejeição referencia data/versão e aceita motivo opcional. |
-
-Objetos de valor implementados: `DocumentoFiscal`, `Placa`, `Dinheiro`, `ItemOrcamento`, `ReservaPecaConfirmada` e `ConfirmacaoReservaEstoque`; `decimal` representa dinheiro e quantidades, mas as quantidades aceitas neste MVP são inteiras e positivas (saldo físico inteiro não negativo).
-
-## Comandos e eventos candidatos
-
-Comandos são intenções de negócio; eventos são fatos que ocorreram. Nomes abaixo não implicam mensageria ou event sourcing.
-
-| Comando candidato | Eventos candidatos após sucesso |
-|---|---|
-| RegistrarCliente / InativarCliente | ClienteRegistrado / ClienteInativado |
-| RegistrarVeiculo / VincularVeiculo | VeiculoRegistrado / VeiculoVinculadoAoCliente |
-| AbrirOrdemDeServico | OrdemDeServicoRecebida |
-| IniciarDiagnostico | DiagnosticoIniciado |
-| AdicionarServico / AdicionarPeca | ItemDeServicoAdicionado / PecaAdicionada |
-| GerarOrcamento | OrcamentoGerado |
-| DisponibilizarOrcamento | OrcamentoDisponibilizado |
-| AprovarOrcamento | OrcamentoAprovado; aplicação reserva as peças da versão aprovada |
-| RejeitarOrcamento | OrcamentoRejeitado; OrdemDeServicoRetornadaAoDiagnostico |
-| RevisarOrcamento | NovaVersaoDeOrcamentoGerada (pendente: política de versões) |
-| IniciarExecucao | ExecucaoIniciada; exige recibos de reserva correspondentes e a aplicação baixa as reservas |
-| FinalizarExecucao | ExecucaoFinalizada / OrdemDeServicoFinalizada |
-| EntregarVeiculo | VeiculoEntregue |
-| AjustarEstoque / DevolverPeca | EstoqueMovimentado / EstoqueDevolvido |
-
-Os comandos de CRUD de serviço/peça/insumo e cadastro complementam os fluxos. Eventos definitivos devem ser atualizados após o Event Storming e refletir o código real.
-
-## Transições de OS — implementadas e pendências
-
-| De | Para | Ação de negócio proposta | Observação |
+| Estado atual | Comando | Estado após sucesso | Observação |
 |---|---|---|---|
-| Recebida | Em diagnóstico | Iniciar diagnóstico | Implementado |
-| Em diagnóstico | Aguardando aprovação | Disponibilizar orçamento | Implementado; cria versão concreta não vazia, calcula linhas e total |
-| Aguardando aprovação | Em diagnóstico | Rejeitar orçamento | Implementado; registra versão/data e motivo opcional |
-| Aguardando aprovação (aprovada) | Em execução | Iniciar execução | Ação separada; requer confirmação tipada que corresponde às peças/quantidades da versão aprovada |
-| Em execução | Finalizada | Finalizar execução | Implementado; guarda data/hora de conclusão |
-| Finalizada | Entregue | Entregar veículo | Implementado |
+| `Recebida` | `IniciarDiagnostico` | `EmDiagnostico` | Grava histórico. |
+| `EmDiagnostico` | `DisponibilizarOrcamento` | `AguardandoAprovacao` | Gera nova versão com snapshots do Catálogo. |
+| `AguardandoAprovacao` | `RejeitarOrcamento` | `EmDiagnostico` | Guarda decisão, versão, data e motivo opcional; preserva versões. |
+| `AguardandoAprovacao` | `AprovarOrcamento` | `AguardandoAprovacao` | Registra aprovação separadamente; reserva todas as peças somente se houver saldo suficiente para o conjunto. |
+| `AguardandoAprovacao` aprovado | `IniciarExecucao` | `EmExecucao` | Application valida/reserva, compõe confirmação, baixa estoque e inicia OS na mesma transação. Se faltar estoque, falha sem remover a aprovação. |
+| `EmExecucao` | `FinalizarExecucao` | `Finalizada` | Grava instante de conclusão. |
+| `Finalizada` | `EntregarVeiculo` | `Entregue` | Estado final da OS. |
 
-Não há status adicional. Cancelamento de OS está fora do escopo da Etapa 2. A camada Application valida o vínculo cliente/veículo e coordena reserva após aprovação, confirmação e baixa no início. Ao substituir orçamento aprovado antes da baixa, deve liberar as reservas da versão anterior na mesma transação que publica a nova versão; esse fluxo, atomicidade, concorrência, rollback e testes PostgreSQL são responsabilidades da Etapa 3. Quantidades fracionárias não são aceitas neste MVP. A confirmação é reutilizável e não prova reserva persistida ativa: a Application deve obter recibos do fluxo de reserva persistida e garantir uso transacional único na Etapa 3.
+Substituir orçamento aprovado antes da baixa libera as reservas da versão anterior na operação transacional e cria nova versão ainda não aprovada. Não há status de cancelamento nem fluxo de reparos adicionais após o início da execução.
 
-## Identidade e consulta
+## Decisões técnicas aplicadas
 
-O enunciado exige consulta de andamento por cliente, mas não dita o mecanismo. Validar autenticação de cliente ou token limitado a uma OS, escopo, expiração/revogação, minimização de dados e proteção contra enumeração. O perfil administrativo único não deve ser confundido com a identidade/autorização do cliente.
+- Monólito modular em camadas .NET 10: `Domain` não referencia EF Core/ASP.NET; `Application` depende de Domain; `Infrastructure` implementa persistência; `Api` faz composição e HTTP.
+- PostgreSQL + EF Core/Npgsql com migration versionada, constraints/índices, `numeric` e FKs explícitas.
+- Concorrência otimista com `xmin` em OS e estoque; conflitos são convertidos em `ConcurrencyConflictException`, expostos como HTTP 409; sem retry automático.
+- Transações explícitas no Unit of Work para aprovação/reserva, substituição e início/baixa. Os testes PostgreSQL reais cobrem aprovação/reserva/baixa, falha após gravação e conflito com dois `DbContext`; não cobrem ainda todas as combinações de multi-peça concorrente.
+- A migration é aplicada por `dotnet ef database update`/fixture de testes; o startup da API não migra automaticamente o banco.
+- Testes de persistência recebem `OFICINA_TEST_POSTGRES`; os cenários críticos limpam os próprios registros, sem truncar tabelas.
 
-## Perguntas que o Event Storming deve resolver
+## Pendências de validação de domínio
 
-1. A reserva de várias peças deve ser atômica? Como liberar/devolver reserva em outros fluxos fora da substituição aprovada?
-2. Como novos itens são autorizados após rejeição e após início da execução?
-3. Qual evento marca início/fim para o indicador: execução da OS ou execução individual de cada serviço?
-6. Quais atores podem diagnosticar, orçar, aprovar, iniciar, finalizar, entregar e ajustar estoque?
-7. Qual política de exclusão/inativação aplica a cada cadastro e às relações já existentes?
-
-
-## Implementacao da Etapa 3
-
-A Application valida o vinculo cliente/veiculo, monta snapshots do catalogo para cada versao do orcamento e coordena os agregados OS e Estoque. A aprovacao persiste mesmo se nao houver estoque suficiente; quando houver saldo integral, a reserva acontece na mesma transacao. O inicio da execucao verifica as reservas carregadas do PostgreSQL e, para uma aprovacao sem reserva por falta anterior de saldo, tenta reservar novamente. Se ainda faltar estoque, a operacao falha sem mudar a OS aprovada. A confirmacao tipada e criada somente pela Application a partir das reservas consultadas e nunca e recebida por HTTP.
-
-O Unit of Work implementa transacoes PostgreSQL e traduz conflitos de concorrencia otimista em conflito explicito. As validacoes com repositórios fake sao unitarias e nao substituem os testes round-trip ou de concorrencia executados com PostgreSQL.
+O PDF não especifica canal de envio do orçamento, política de estoque insuficiente, identidade do cliente, cancelamento, devolução, imposto/desconto, pausas de execução ou granularidade do indicador. Decisões de negócio já registradas em `docs/decisoes-negocio.md` orientam a implementação, mas os pontos ainda abertos — em especial DB06 (métrica por OS ou serviço), devoluções/cancelamentos e acesso do cliente — continuam propostas/pendências do grupo, não regras FIAP.

@@ -1,54 +1,69 @@
 # Matriz de rastreabilidade — Fase 1
 
-Fonte: `docs/requisitos-fiap.md`, conferido contra o PDF original em `docs/ddd/referencias/Fase 1 - Tech Challenge.pdf` (12 páginas; requisitos e entregáveis nas páginas 2–11). Os casos de uso, testes e evidências abaixo são planejamento, não funcionalidades já implementadas.
+Auditoria documental/código em 2026-11-03. Fonte dos requisitos: [`requisitos-fiap.md`](requisitos-fiap.md), transcrição do PDF oficial citado no próprio documento. Matriz descreve o que foi observado no código e nas evidências disponíveis; não substitui validação pelo grupo nem uma execução no commit final.
+
+## Legenda
+
+- **Concluído (C):** implementação/evidência observada para o escopo indicado.
+- **Parcial (P):** existe implementação, mas há lacuna explícita de comportamento, teste, escopo ou evidência.
+- **Pendente/não comprovado (N):** não foi possível comprovar no repositório/execução acessível; não significa necessariamente ausência de trabalho fora dele.
 
 ## Requisitos funcionais
 
-| ID | Requisito | Caso de uso / área prevista | Testes planejados | Evidência de entrega |
-|---|---|---|---|---|
-| RF01 | Identificar cliente por CPF/CNPJ ao criar OS | Criar OS / Cadastro | Unitário de DocumentoFiscal e integração da criação | OpenAPI, execução demonstrada e teste |
-| RF02 | CRUD de clientes | Cadastro | Unitários de regras e integração CRUD/validações | OpenAPI, persistência e testes |
-| RF03 | CRUD de veículos com placa, marca, modelo e ano | Cadastro | Unitário de Placa e integração CRUD | OpenAPI, persistência e testes |
-| RF04 | CRUD de serviços e inclusão dos solicitados na OS | Catálogo / Atendimento | Unitário de regras de itens e integração catálogo–OS | OpenAPI, cenário de OS e testes |
-| RF05 | CRUD de peças/insumos e controle de estoque | Catálogo e Estoque | Unitário de movimentos/invariantes e integração concorrente | OpenAPI, histórico/saldo e testes de estoque |
-| RF06 | Incluir peças/insumos necessários na OS | Atendimento / Estoque | Unitário de composição e integração de disponibilidade | OpenAPI e cenário demonstrado |
-| RF07 | Gerar orçamento automaticamente com serviços e peças | Atendimento / Orçamento | Unitário de cálculo/snapshots e integração do fluxo | Orçamento exibido na API e testes |
-| RF08 | Enviar ou disponibilizar orçamento para aprovação | Atendimento / Orçamento | Unitário de estado e integração de disponibilização | OpenAPI e demonstração; sem provedor de envio exigido |
-| RF09 | Registrar aprovação ou rejeição do orçamento | Atendimento / Orçamento | Unitários de decisão/revisão e integração do fluxo | Histórico de decisões e testes |
-| RF10 | Manter os seis status da OS | Atendimento / OS | Teste unitário de cada estado | Histórico/status na API e demonstração |
-| RF11 | Controlar transições conforme ações/regras | Atendimento / OS | Testes unitários de transições válidas e inválidas | Regras documentadas, respostas da API e testes |
-| RF12 | Cliente consulta andamento via API | Identidade / Consulta de OS | Integração de autorização, escopo e tentativas de acesso cruzado | OpenAPI e demonstração segura |
-| RF13 | Listar e detalhar OS | Atendimento / Consulta administrativa | Integração de filtros, detalhe e autorização | OpenAPI e demonstração administrativa |
-| RF14 | Monitorar ou calcular tempo médio dos serviços | Indicadores | Unitário do cálculo e integração da consulta/agregação | Resultado reproduzível, regra documentada e teste |
-
-## Requisitos técnicos e entregáveis
-
-| ID | Requisito | Planejamento / validação futura | Evidência esperada |
+| ID | Status | Evidência observada | Lacuna ou ação restante |
 |---|---|---|---|
-| RT01 | Back-end monolítico em camadas | Estrutura Api/Application/Domain/Infrastructure | Diagrama e dependências verificáveis no código |
-| RT02 | Banco livre, com justificativa | PostgreSQL aprovado; justificar no ADR | ADR e README |
-| RT03 | API REST documentada | OpenAPI/Swagger | Interface/documento publicado e exemplos |
-| RT04 | JWT nas APIs administrativas | Perfil administrativo único no MVP | Testes de acesso autenticado e negado |
-| RT05 | Validar CPF/CNPJ e placa | Objetos de valor no domínio | Testes de borda e erros documentados |
-| RT06 | Testes unitários e integração dos fluxos principais | Estratégia em `docs/estrategia-testes.md` | Execução automatizada e resultados |
-| RT07 | Cobertura mínima de 80% nos domínios críticos | Escopo e métrica definidos em `docs/estrategia-testes.md` | Relatório versionado/artefato de CI |
-| RT08 | Dockerfile e Compose para ambiente completo | Previsto em etapa futura | Execução documentada; fora da Etapa 0 |
-| RT09 | Execução local simples e README | Requisitos de conteúdo registrados no requisito oficial | README e execução reproduzível |
-| RT10 | Transações nos fluxos principais | Orçamento/estoque/OS com concorrência definida antes de implementar | Testes de integração e desenho de persistência |
-| RT11 | Análise de vulnerabilidades e resultado no repositório | Definir ferramentas e momento da análise na etapa de qualidade | Relatório/resultado reproduzível |
+| RF01 | C | Criação de OS recebe cliente/veículo; domínio usa DocumentoFiscal; testes unitários e PostgreSQL cobrem agregados. | Repetir execução no commit final. |
+| RF02 | C | CRUD `/api/clientes`, protegido por política administrativa; persistência EF. | Demonstrar e guardar saída associada ao commit final. |
+| RF03 | C | CRUD `/api/veiculos`; VO Placa e constraint única de placa. | Demonstrar validação e unicidade. |
+| RF04 | C | CRUD `/api/servicos`; serviços são itens do orçamento/OS e preservam snapshot. | Evidência de ponta a ponta deve ser gravada. |
+| RF05 | P | CRUD `/api/pecas`, entrada e consulta de estoque, reserva/baixa e testes de fluxo crítico. | Não há entidade separada `Insumo`; confirmar se `Peca` satisfaz o enunciado. CRUD de ajuste/saída não foi evidenciado além do fluxo operacional. |
+| RF06 | C | OS aceita serviços/peças usados na composição do orçamento; testes de domínio e fluxo PostgreSQL. | Demonstrar inclusão por API no vídeo. |
+| RF07 | C | Orçamento versionado calculado a partir de itens/snapshots; total persistido e testado. | Confirmar cenário demonstrado no commit final. |
+| RF08 | C | Orçamento é disponibilizado por fluxo/API para decisão; sem provedor de envio externo, que não é exigido pelo texto (“enviar ou disponibilizar”). | Descrever como disponibilização pela API. |
+| RF09 | P | API registra aprovação/rejeição e histórico; aprovação pode reservar estoque. | Ambos endpoints estão protegidos como administrativos. Não existe decisão autenticada pelo cliente; validar ator esperado pelo grupo/FIAP. |
+| RF10 | C | Domínio representa Recebida, EmDiagnostico, AguardandoAprovacao, EmExecucao, Finalizada e Entregue. | Evidência da demonstração cobrindo transições. |
+| RF11 | C | Transições e invariantes residem no agregado de OS; testes unitários cobrem estados inválidos. | Repetir a suíte final. |
+| RF12 | P | Token de cliente tem escopo de uma OS; consulta verifica claim `ordem_id`. | Não foi comprovado teste automatizado de tentativa de consultar outra OS; decisão do orçamento pelo cliente também ausente. |
+| RF13 | C | Endpoints administrativos listam/detalham OS e exigem JWT administrador. | Demonstrar autorização e respostas na gravação. |
+| RF14 | P | Endpoint administrativo de tempo médio de execução implementado. | Regra de agregação/granularidade ainda não está suficientemente determinada pelo requisito; demonstrar resultado e explicitar interpretação adotada. |
 
-## Evidências transversais da entrega
+## Requisitos técnicos
 
-| Evidência FIAP | Critério verificável |
-|---|---|
-| PDF único | Curso SOAT, fase, grupo, integrantes, RMs, Discord, linguagem/tecnologias e links completos |
-| Repositório | Público durante avaliação, sem segredos, versão por branch/tag/hash; `main` protegida e PRs |
-| Vídeo | Público no YouTube, até 15 min, demonstra solução real, arquitetura, Event Storming, DDD, fluxos, auth, API, testes e análise de vulnerabilidades |
-| DDD | Link público sem concessão manual; exports versionados em `docs/ddd/`; documentação consistente com o código entregue |
-| README | Objetivo, solução, arquitetura, stack, pré-requisitos, execução/testes, Swagger, justificativa do banco, autenticação, diretórios, links DDD e vídeo |
+| ID | Status | Evidência observada | Lacuna ou ação restante |
+|---|---|---|---|
+| RT01 | C | Solution separa Api/Application/Domain/Infrastructure; arquitetura e referências revisadas. | Confirmar diagrama/reflexo final depois do commit. |
+| RT02 | C | PostgreSQL e Npgsql configurados; justificativa documentada no README/ADR. | — |
+| RT03 | C | Swagger e `/openapi/v1.json` disponíveis no ambiente Development do Compose. | Não publicar a configuração Development como produção. |
+| RT04 | C | Rotas administrativas usam política JWT; testes de autenticação e execução API anterior confirmaram 401 sem token e acesso autenticado. | Anexar saída/vídeo no commit final sem revelar token. |
+| RT05 | C | DocumentoFiscal e Placa no Domain com testes unitários. | — |
+| RT06 | C | 63 testes conhecidos: 48 Domain + 15 Integration, incluindo PostgreSQL real conforme execução reportada pelo grupo. | Reexecutar após alterações técnicas ou no commit de entrega. |
+| RT07 | P | Relatório versionado informa Domain: 96,00% linhas e 85,39% branches. | Escopo é apenas Domain; não prova cobertura ≥80% de todos os domínios críticos/camadas. Delimitar e produzir evidência final verificável. |
+| RT08 | C | Dockerfile e Compose presentes; API/PostgreSQL executados previamente pelo grupo. | Repetir `docker compose up --build` no ambiente final. |
+| RT09 | C | README atualizado com arquitetura, configuração, endpoints, migrations e testes. | Validar comandos no ambiente limpo/commit final. |
+| RT10 | C | Transações no fluxo de orçamento/estoque; testes PostgreSQL de rollback pós-save e concorrência com dois DbContexts. | Corridas multi-peça e todas as interleavings não estão comprovadas. |
+| RT11 | P | `dotnet list ... --vulnerable --include-transitive` reportou zero pacotes vulneráveis nos seis projetos em 2026-11-03. Revisão de código e busca heurística documentadas. | Scanner de imagem não executado: tentativa Docker Scout bloqueada pela revisão automática, pois pode enviar metadados/SBOM a serviço externo. Sem scanner dedicado de segredos. Consultar relatório. |
 
-## Lacunas de rastreabilidade
+## Entregáveis transversais
 
-- Os casos de uso acima são nomes de planejamento; detalhes ainda dependem das decisões de `docs/decisoes-negocio.md` e Event Storming.
-- O requisito de cobertura não define o que significa “domínios críticos”. Este plano delimita o escopo medido na estratégia de testes e mantém a métrica como evidência, não como garantia de correção.
-- A FIAP pede autorização de reparos adicionais via aplicativo como contexto do desafio. Como o escopo entregue é back-end, confirmar se isso será coberto pelo mesmo fluxo de revisão/aprovação de orçamento ou se o grupo precisa demonstrar uma operação distinta.
+| Entregável | Status | Evidência/ação restante |
+|---|---|---|
+| README | C | README versionado; validar comandos e links no commit final. |
+| DDD e diagramas versionados | P | Modelagem e Mermaid presentes e alinhados ao código auditado. Ainda falta validar com grupo as fronteiras, linguagem ubíqua e decisões de workshop. |
+| Workshop Event Storming | N | Diagramas Mermaid são derivados do código, não comprovam sessão, participantes, data ou decisões colaborativas. Realizar/registrar e anexar links/exports públicos. |
+| Exports PDF/imagem em `docs/ddd/` | N | Não comprovados nesta auditoria; gerar a partir dos boards finais e versionar. |
+| Análise de vulnerabilidades | P | Evidência NuGet e revisão registrada. CVE de imagem e scanner dedicado ainda pendentes. |
+| Repositório público, branch protegida e PR | N | Estado remoto/permissões não comprovados localmente; verificar no GitHub. |
+| Branch/hash final | N | Informar no PDF e confirmar que vídeo, relatório e código correspondem ao mesmo commit. |
+| Vídeo público ≤15 min | N | Roteiro de 9 min preparado; gravar, publicar e conferir acesso/link. |
+| PDF único FIAP | N | Preparar identificação, grupo, RMs, Discord, stack, links clicáveis, branch/hash e evidências. |
+| Repositório sem segredos | P | `.env` ignorado e busca heurística sem ocorrência óbvia; executar scanner dedicado e revisar histórico antes de tornar público. |
+
+## Lacunas que exigem decisão ou evidência
+
+1. Validar se aprovação/rejeição deve ser feita pelo cliente ou pelo administrador; a API atual oferece apenas decisão administrativa.
+2. Confirmar se o modelo `Peca` cobre o termo “insumo” ou se a FIAP espera cadastro distinto.
+3. Criar teste de autorização cruzada para consulta de OS com token de outra OS.
+4. Definir/documentar interpretação do tempo médio do requisito RF14.
+5. Completar cobertura do domínio crítico no escopo aprovado; o relatório atual é somente Domain.
+6. Concluir análise de CVEs da imagem com ferramenta e política aprovadas; Docker Scout não foi executado por bloqueio automático relacionado à possível transmissão externa de metadados/SBOM.
+7. Produzir evidências externas: board/exports reais de Event Storming, vídeo e PDF final; verificar publicação e correspondência com o commit entregue.

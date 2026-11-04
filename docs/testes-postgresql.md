@@ -10,10 +10,14 @@ No PowerShell, com Docker Desktop ativo:
 
 ```powershell
 $env:POSTGRES_PASSWORD = "senha-local"
+$env:AUTHENTICATION_SIGNING_KEY = "chave-local-com-pelo-menos-32-caracteres"
+$env:AUTHENTICATION_ADMIN_USERNAME = "admin-local"
+$env:AUTHENTICATION_ADMIN_PASSWORD = "senha-admin-local"
 docker compose up -d db
-docker compose exec db createdb -U oficina oficina_test
+$dbExists = docker compose exec -T db psql -U oficina -d oficina -tAc "SELECT 1 FROM pg_database WHERE datname = 'oficina_test'"
+if ($dbExists.Trim() -ne "1") { docker compose exec db createdb -U oficina oficina_test }
 $env:OFICINA_TEST_POSTGRES = "Host=localhost;Port=5432;Database=oficina_test;Username=oficina;Password=senha-local"
 dotnet test tests/Oficina.Integration.Tests/Oficina.Integration.Tests.csproj --filter FullyQualifiedName~Postgres
 ```
 
-O filtro executa os testes do PostgreSQL real, incluindo fluxo transacional e concorrência. A fixture aplica migrations à base configurada. Não é necessário apagar ou recriar a base entre execuções; os testes removem seus próprios dados. Para a aplicação no Compose, configure também `AUTHENTICATION_SIGNING_KEY`, `AUTHENTICATION_ADMIN_USERNAME` e `AUTHENTICATION_ADMIN_PASSWORD` conforme o README.
+O filtro executa os testes do PostgreSQL real, incluindo fluxo transacional e concorrência. A fixture aplica migrations à base configurada. Não é necessário apagar ou recriar a base entre execuções; os testes removem seus próprios dados. As quatro variáveis estão no exemplo porque o Compose valida substituições também quando apenas `db` é iniciado. Use valores locais, nunca versionados. Não execute `createdb` diretamente se a base já existe; o bloco acima verifica isso primeiro.
