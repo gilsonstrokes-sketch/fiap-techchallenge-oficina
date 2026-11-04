@@ -24,14 +24,23 @@ As dependências seguem `Domain <- Application <- Infrastructure <- Api`; a API 
 
 ## Executar com Docker Compose
 
-No PowerShell, defina uma senha local para o PostgreSQL e suba os serviços:
+No PowerShell, configure segredos apenas na sessão local. A chave JWT precisa ter pelo menos 32 bytes:
 
 ```powershell
-$env:POSTGRES_PASSWORD = "escolha-uma-senha-local"
+$rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+$secretBytes = New-Object 'Byte[]' 32
+$rng.GetBytes($secretBytes)
+$env:POSTGRES_PASSWORD = [Convert]::ToBase64String($secretBytes)
+$rng.GetBytes($secretBytes)
+$env:AUTHENTICATION_SIGNING_KEY = [Convert]::ToBase64String($secretBytes)
+$env:AUTHENTICATION_ADMIN_USERNAME = "admin-local"
+$rng.GetBytes($secretBytes)
+$env:AUTHENTICATION_ADMIN_PASSWORD = [Convert]::ToBase64String($secretBytes)
+$rng.Dispose()
 docker compose up --build
 ```
 
-O Compose inicia PostgreSQL e API. A senha vem do ambiente e não fica armazenada no repositório. Para encerrar, use `Ctrl+C`; para remover os containers mantendo os dados, execute `docker compose down`. Para apagar também o volume local de dados, use `docker compose down --volumes`.
+O Compose inicia PostgreSQL e API. As credenciais do banco e do JWT vêm do ambiente e não ficam armazenadas no repositório. Para encerrar, use `Ctrl+C`; para remover os containers mantendo os dados, execute `docker compose down`. Não use `docker compose down --volumes` se quiser preservar os dados locais.
 
 - API: <http://localhost:8080>
 - Health check da API: <http://localhost:8080/health>
@@ -79,11 +88,11 @@ dotnet build Oficina.slnx --no-restore
 dotnet test Oficina.slnx --no-build
 ```
 
-Testes unitários de Domain cobrem invariantes e transições; testes de Application usam repositórios fake para validar coordenação de aprovação, reserva, baixa e vínculo cliente/veículo. Testes HTTP verificam health, OpenAPI e JWT. O round trip real depende de PostgreSQL e é ignorado se `OFICINA_TEST_POSTGRES` não estiver configurada; EF InMemory não é usado como substituto. Para executá-lo, inicie o Compose e defina `OFICINA_TEST_POSTGRES` com uma connection string de teste antes de `dotnet test`.
+Testes unitários de Domain cobrem invariantes e transições; testes de Application com repositórios fake validam coordenação, enquanto testes PostgreSQL reais validam round trip, aprovação/reserva/baixa, rollback e concorrência otimista com dois `DbContext`. Testes HTTP verificam health, OpenAPI e autenticação JWT. Os testes PostgreSQL são ignorados se `OFICINA_TEST_POSTGRES` não estiver configurada e usam uma base descartável dedicada; EF InMemory não substitui PostgreSQL. Consulte `docs/testes-postgresql.md` para os comandos.
 
 A cobertura medida de `Oficina.Domain` é 89,28% de linhas e 81,05% de branches; relatório Cobertura está em `artifacts/coverage/oficina-domain.cobertura.xml`. Para reproduzir, rode `dotnet test Oficina.slnx --collect:"XPlat Code Coverage"` e confira o relatório do pacote `Oficina.Domain`.
 
-Neste ambiente sem Docker, não foram executados round trips PostgreSQL, aplicação da migration nem testes de concorrência real. Mapeamentos e transações ainda precisam ser verificados contra PostgreSQL.
+O health check informa a saúde do processo, não a conectividade com o PostgreSQL. Os testes de persistência usam a base especificada por `OFICINA_TEST_POSTGRES`, aplicam migrations e limpam apenas os dados criados pelos próprios cenários.
 
 ## Decisões e documentação
 

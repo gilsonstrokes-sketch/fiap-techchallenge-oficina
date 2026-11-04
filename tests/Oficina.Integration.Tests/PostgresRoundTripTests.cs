@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Oficina.Domain.Atendimento;
@@ -25,16 +26,23 @@ public sealed class PostgresFactAttribute : FactAttribute
 
 public sealed class PostgresDatabaseFixture : IAsyncLifetime
 {
-    private readonly DbContextOptions<OficinaDbContext> _options;
+    private readonly string _connectionString;
 
     public PostgresDatabaseFixture()
     {
         var connectionString = Environment.GetEnvironmentVariable("OFICINA_TEST_POSTGRES")
             ?? throw new InvalidOperationException("OFICINA_TEST_POSTGRES não foi configurada.");
-        _options = new DbContextOptionsBuilder<OficinaDbContext>().UseNpgsql(connectionString).Options;
+        _connectionString = connectionString;
     }
 
-    public OficinaDbContext CriarContexto() => new(_options);
+    public OficinaDbContext CriarContexto(params IInterceptor[] interceptors)
+    {
+        var options = new DbContextOptionsBuilder<OficinaDbContext>()
+            .UseNpgsql(_connectionString)
+            .AddInterceptors(interceptors)
+            .Options;
+        return new OficinaDbContext(options);
+    }
 
     public async Task InitializeAsync()
     {
@@ -45,7 +53,8 @@ public sealed class PostgresDatabaseFixture : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 }
 
-public sealed class PostgresRoundTripTests(PostgresDatabaseFixture fixture) : IClassFixture<PostgresDatabaseFixture>
+[Collection(PostgresIntegrationCollection.Name)]
+public sealed class PostgresRoundTripTests(PostgresDatabaseFixture fixture)
 {
     [PostgresFact]
     public async Task Agregados_PersistemERecuperamOrcamentosHistoricoEReservas()
